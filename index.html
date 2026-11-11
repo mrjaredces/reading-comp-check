@@ -10,11 +10,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- React & ReactDOM 18 UMD -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone for JSX Compilation (Must be type="text/babel") -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
     body {
@@ -25,6 +20,20 @@
     }
     .serif-passage {
       font-family: 'Merriweather', Georgia, serif;
+    }
+
+    /* Global Error Banner */
+    #global-error-display {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background-color: #ef4444;
+      color: white;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: bold;
+      z-index: 99999;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
     }
 
     /* Print Stylesheet Optimization */
@@ -62,11 +71,31 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="root"></div>
 
-  <!-- Note: type="text/babel" is MANDATORY for Babel standalone compilation -->
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+  <!-- Diagnostic Error Catch Banner -->
+  <div id="global-error-display"></div>
+
+  <!-- Main App Root Container -->
+  <div id="app"></div>
+
+  <script>
+    // Global Error Safety Handler
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+      var errDisplay = document.getElementById('global-error-display');
+      if (errDisplay) {
+        errDisplay.style.display = 'block';
+        errDisplay.innerHTML = '⚠️ <b>Application Error:</b> ' + msg + ' (Line ' + lineNo + ')';
+      }
+      return false;
+    };
+
+    window.onunhandledrejection = function(event) {
+      var errDisplay = document.getElementById('global-error-display');
+      if (errDisplay) {
+        errDisplay.style.display = 'block';
+        errDisplay.innerHTML = '⚠️ <b>Unhandled Promise Rejection:</b> ' + (event.reason ? event.reason.message || event.reason : 'Unknown Error');
+      }
+    };
 
     // PRE-LOADED DEMO PASSAGES (STRICTLY NO VOCABULARY GLOSSARY)
     const DEMO_PASSAGES = [
@@ -202,161 +231,90 @@ The sun was dropping behind the western ridges, signaling that night was near. L
       { id: '1100L+', label: '1100L+', grade: 'Grades 9 - 12+ (High School)' }
     ];
 
-    function App() {
-      // Configuration & Settings State
-      const [lexile, setLexile] = useState('800L-900L');
-      const [textType, setTextType] = useState('Informational');
-      const [topic, setTopic] = useState('');
-      const [numQuestions, setNumQuestions] = useState(4);
-      const [dokTypes, setDokTypes] = useState(['Literal', 'Inferential', 'Evaluative', 'Context Clues']);
-      
-      const [webhookUrl, setWebhookUrl] = useState(() => {
-        return localStorage.getItem('readcheck_webhook_url') || '';
-      });
-      const [showSettingsModal, setShowSettingsModal] = useState(false);
+    // APPLICATION STATE MANAGEMENT
+    const state = {
+      activeTab: 'config', // 'config' | 'print' | 'student' | 'library'
+      lexile: '800L-900L',
+      textType: 'Informational',
+      topic: '',
+      numQuestions: 4,
+      dokTypes: ['Literal', 'Inferential', 'Evaluative', 'Context Clues'],
+      webhookUrl: localStorage.getItem('readcheck_webhook_url') || '',
+      showSettingsModal: false,
+      passageData: DEMO_PASSAGES[0],
+      loading: false,
+      loadingMessage: '',
+      toast: null,
 
-      // App Tab View: 'config' | 'print' | 'student' | 'library'
-      const [activeTab, setActiveTab] = useState('config');
-      const [passageData, setPassageData] = useState(DEMO_PASSAGES[0]);
-      const [loading, setLoading] = useState(false);
-      const [loadingMessage, setLoadingMessage] = useState('');
-      const [toast, setToast] = useState(null);
+      // Student Mode State
+      studentName: '',
+      studentAnswers: {},
+      isSubmitted: false,
+      submittedResult: null,
 
-      // Student Mode Assessment State
-      const [studentName, setStudentName] = useState('');
-      const [studentAnswers, setStudentAnswers] = useState({});
-      const [isSubmitted, setIsSubmitted] = useState(false);
-      const [submittedResult, setSubmittedResult] = useState(null);
-
-      // Student View Reader Controls
-      const [lineReaderActive, setLineReaderActive] = useState(false);
-      const [lineReaderY, setLineReaderY] = useState(120);
-      const [studentTheme, setStudentTheme] = useState('light'); // 'light' | 'sepia' | 'dark'
-      const [studentFontSize, setStudentFontSize] = useState('medium'); // 'small' | 'medium' | 'large'
-      const passageBoxRef = useRef(null);
+      // Reader Controls
+      lineReaderActive: false,
+      lineReaderY: 120,
+      studentTheme: 'light', // 'light' | 'sepia' | 'dark'
+      studentFontSize: 'medium', // 'small' | 'medium' | 'large'
 
       // Print Controls
-      const [printShowKey, setPrintShowKey] = useState(false);
+      printShowKey: false,
 
-      // Persistent Storage
-      const [submissions, setSubmissions] = useState(() => {
-        const saved = localStorage.getItem('readcheck_submissions_log');
-        return saved ? JSON.parse(saved) : [];
-      });
+      // Saved Submissions
+      submissions: JSON.parse(localStorage.getItem('readcheck_submissions_log') || '[]')
+    };
 
-      useEffect(() => {
-        localStorage.setItem('readcheck_webhook_url', webhookUrl);
-      }, [webhookUrl]);
+    function setState(newState) {
+      Object.assign(state, newState);
+      renderApp();
+    }
 
-      const showToast = (msg, type = 'success') => {
-        setToast({ msg, type });
-        setTimeout(() => setToast(null), 3800);
-      };
+    function showToast(msg, type = 'success') {
+      state.toast = { msg, type };
+      renderApp();
+      setTimeout(() => {
+        state.toast = null;
+        renderApp();
+      }, 3800);
+    }
 
-      // Mouse position tracker for visual line reader bar
-      const handlePassageMouseMove = (e) => {
-        if (!lineReaderActive || !passageBoxRef.current) return;
-        const rect = passageBoxRef.current.getBoundingClientRect();
-        const yPos = e.clientY - rect.top;
-        setLineReaderY(Math.max(20, Math.min(yPos, rect.height - 20)));
-      };
-
-      // CSV Data Exporter for Google Sheets
-      const exportSubmissionsToCSV = (subsToExport = submissions) => {
-        if (!subsToExport || subsToExport.length === 0) {
-          showToast('No student submissions found to export.', 'error');
-          return;
-        }
-
-        const maxQs = Math.max(...subsToExport.map(s => (s.questions ? s.questions.length : 4)));
-        let qHeaders = [];
-        for (let i = 1; i <= maxQs; i++) {
-          qHeaders.push(`Q${i}_Selected`, `Q${i}_CorrectAnswer`, `Q${i}_Result`);
-        }
-
-        const headers = [
-          'Student Name',
-          'Date & Time',
-          'Passage Title',
-          'Lexile Level',
-          'Score',
-          'Max Score',
-          'Percentage',
-          ...qHeaders
-        ];
-
-        const rows = subsToExport.map(s => {
-          const qDetails = (s.questions || []).flatMap((q) => {
-            const studentAnsIdx = s.answers[q.id];
-            const studentAnsLetter = studentAnsIdx !== undefined ? String.fromCharCode(65 + studentAnsIdx) : 'N/A';
-            const correctAnsLetter = String.fromCharCode(65 + q.correctAnswer);
-            const isRight = studentAnsIdx === q.correctAnswer ? 'CORRECT' : 'INCORRECT';
-            return [studentAnsLetter, correctAnsLetter, isRight];
-          });
-
-          return [
-            `"${(s.studentName || 'Anonymous').replace(/"/g, '""')}"`,
-            `"${s.timestamp}"`,
-            `"${s.passageTitle.replace(/"/g, '""')}"`,
-            `"${s.lexile}"`,
-            s.score,
-            s.maxScore,
-            `"${Math.round((s.score / s.maxScore) * 100)}%"`,
-            ...qDetails
-          ].join(',');
+    // CORS-Safe Proxy Post to Google Apps Script
+    async function sendToAppsScriptProxy(payloadData) {
+      if (!state.webhookUrl.trim()) return null;
+      try {
+        const res = await fetch(state.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payloadData)
         });
-
-        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `reading_assessment_results_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast('Downloaded Google Sheets CSV export!');
-      };
-
-      // CORS-Safe Post Payload to Google Apps Script Proxy
-      const sendToAppsScriptProxy = async (payloadData) => {
-        if (!webhookUrl.trim()) return null;
-        try {
-          // Using text/plain prevents CORS preflight OPTIONS requests from being blocked by Google
-          const res = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(payloadData)
-          });
-          if (res.ok) {
-            const text = await res.text();
-            try {
-              return JSON.parse(text);
-            } catch (e) {
-              return text;
-            }
-          }
-        } catch (err) {
-          console.warn('Apps Script Webhook request error:', err);
+        if (res.ok) {
+          const text = await res.text();
+          try { return JSON.parse(text); } catch (e) { return text; }
         }
-        return null;
-      };
+      } catch (err) {
+        console.warn('Proxy Request Error:', err);
+      }
+      return null;
+    }
 
-      // Generator Action
-      const handleGeneratePassage = async () => {
-        setLoading(true);
-        setLoadingMessage('Communicating with Proxy Webhook to generate passage...');
+    // Generator Handler
+    async function handleGeneratePassage() {
+      state.loading = true;
+      state.loadingMessage = 'Communicating with Proxy Webhook...';
+      renderApp();
 
-        const promptText = `Generate a ${textType} reading passage calibrated strictly to ${lexile} Lexile level about '${topic || 'an age-appropriate topic'}'. 
+      const promptText = `Generate a ${state.textType} reading passage calibrated strictly to ${state.lexile} Lexile level about '${state.topic || 'an age-appropriate topic'}'. 
 Passage target word count: ~225 words. 
-Generate ${numQuestions} multiple choice questions focusing on Depth of Knowledge: ${dokTypes.join(', ')}.
+Generate ${state.numQuestions} multiple choice questions focusing on Depth of Knowledge: ${state.dokTypes.join(', ')}.
 
 CRITICAL REQUIREMENT: Strictly DO NOT include any vocabulary glossary, word list, or definition key anywhere in the output.
 
 Return ONLY valid JSON matching this structure:
 {
   "title": "Passage Title",
-  "lexile": "${lexile}",
-  "textType": "${textType}",
+  "lexile": "${state.lexile}",
+  "textType": "${state.textType}",
   "wordCount": 225,
   "summary": "Brief summary",
   "passage": "Full passage text here...",
@@ -372,226 +330,282 @@ Return ONLY valid JSON matching this structure:
   ]
 }`;
 
-        let generatedData = null;
+      let generatedData = null;
 
-        if (webhookUrl.trim()) {
-          const response = await sendToAppsScriptProxy({
-            action: 'generate',
-            prompt: promptText
-          });
-
-          if (response) {
-            try {
-              let jsonString = typeof response === 'string' ? response : (response.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(response));
-              jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-              generatedData = JSON.parse(jsonString);
-            } catch (err) {
-              console.error('JSON parsing failed from webhook response:', err);
-            }
-          }
-        }
-
-        // Fallback to demo passages if Webhook is not configured or fails
-        if (!generatedData) {
-          showToast('Webhook unavailable or not set. Loaded fallback passage.', 'error');
-          generatedData = DEMO_PASSAGES[Math.floor(Math.random() * DEMO_PASSAGES.length)];
-        } else {
-          showToast('Passage generated successfully via Proxy Webhook!');
-        }
-
-        delete generatedData.vocabulary;
-        setPassageData(generatedData);
-        setStudentAnswers({});
-        setIsSubmitted(false);
-        setLoading(false);
-        setActiveTab('print');
-      };
-
-      // Student Submission Action
-      const handleStudentSubmit = () => {
-        if (!studentName.trim()) {
-          showToast('Please enter your full name before submitting.', 'error');
-          return;
-        }
-        if (Object.keys(studentAnswers).length < passageData.questions.length) {
-          showToast('Please answer all questions before submitting.', 'error');
-          return;
-        }
-
-        let score = 0;
-        passageData.questions.forEach(q => {
-          if (studentAnswers[q.id] === q.correctAnswer) {
-            score++;
-          }
+      if (state.webhookUrl.trim()) {
+        const response = await sendToAppsScriptProxy({
+          action: 'generate',
+          prompt: promptText
         });
 
-        const record = {
-          id: 'sub-' + Date.now(),
-          studentName: studentName.trim(),
-          timestamp: new Date().toLocaleString(),
-          passageTitle: passageData.title,
-          lexile: passageData.lexile,
-          score: score,
-          maxScore: passageData.questions.length,
-          answers: studentAnswers,
-          questions: passageData.questions
-        };
-
-        const updated = [record, ...submissions];
-        setSubmissions(updated);
-        localStorage.setItem('readcheck_submissions_log', JSON.stringify(updated));
-
-        // Background POST to Apps Script Webhook
-        if (webhookUrl.trim()) {
-          sendToAppsScriptProxy({
-            action: 'submitResults',
-            ...record
-          });
+        if (response) {
+          try {
+            let jsonString = typeof response === 'string' ? response : (response.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(response));
+            jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+            generatedData = JSON.parse(jsonString);
+          } catch (err) {
+            console.error('JSON parse error from Webhook response:', err);
+          }
         }
+      }
 
-        setSubmittedResult(record);
-        setIsSubmitted(true);
-        showToast('Assessment submitted quietly.');
+      if (!generatedData) {
+        showToast('Webhook unavailable or not set. Loaded fallback passage.', 'error');
+        generatedData = DEMO_PASSAGES[Math.floor(Math.random() * DEMO_PASSAGES.length)];
+      } else {
+        showToast('Passage generated successfully via Proxy!');
+      }
+
+      delete generatedData.vocabulary;
+      state.passageData = generatedData;
+      state.studentAnswers = {};
+      state.isSubmitted = false;
+      state.loading = false;
+      state.activeTab = 'print';
+      renderApp();
+    }
+
+    // Student Submit Handler
+    function handleStudentSubmit() {
+      if (!state.studentName.trim()) {
+        showToast('Please enter your full name before submitting.', 'error');
+        return;
+      }
+      if (Object.keys(state.studentAnswers).length < state.passageData.questions.length) {
+        showToast('Please answer all questions before submitting.', 'error');
+        return;
+      }
+
+      let score = 0;
+      state.passageData.questions.forEach(q => {
+        if (state.studentAnswers[q.id] === q.correctAnswer) score++;
+      });
+
+      const record = {
+        id: 'sub-' + Date.now(),
+        studentName: state.studentName.trim(),
+        timestamp: new Date().toLocaleString(),
+        passageTitle: state.passageData.title,
+        lexile: state.passageData.lexile,
+        score: score,
+        maxScore: state.passageData.questions.length,
+        answers: state.studentAnswers,
+        questions: state.passageData.questions
       };
 
-      const toggleDok = (type) => {
-        if (dokTypes.includes(type)) {
-          if (dokTypes.length > 1) setDokTypes(dokTypes.filter(t => t !== type));
-        } else {
-          setDokTypes([...dokTypes, type]);
-        }
-      };
+      const updated = [record, ...state.submissions];
+      state.submissions = updated;
+      localStorage.setItem('readcheck_submissions_log', JSON.stringify(updated));
 
-      // Reader Theme Helper
-      const getStudentThemeClasses = () => {
-        switch (studentTheme) {
-          case 'sepia':
-            return {
-              bg: 'bg-[#fbf0d9]',
-              card: 'bg-[#f4e7ce] border-[#e2d5b9]',
-              text: 'text-[#433422]',
-              subtext: 'text-[#7a6549]',
-              accent: 'border-[#c9b793]'
-            };
-          case 'dark':
-            return {
-              bg: 'bg-slate-950',
-              card: 'bg-slate-900 border-slate-800',
-              text: 'text-slate-100',
-              subtext: 'text-slate-400',
-              accent: 'border-slate-700'
-            };
-          default:
-            return {
-              bg: 'bg-slate-50',
-              card: 'bg-white border-slate-200',
-              text: 'text-slate-900',
-              subtext: 'text-slate-500',
-              accent: 'border-slate-200'
-            };
-        }
-      };
+      if (state.webhookUrl.trim()) {
+        sendToAppsScriptProxy({
+          action: 'submitResults',
+          ...record
+        });
+      }
 
+      state.submittedResult = record;
+      state.isSubmitted = true;
+      renderApp();
+      showToast('Assessment submitted quietly.');
+    }
+
+    // CSV Exporter
+    function exportSubmissionsToCSV(subsToExport = state.submissions) {
+      if (!subsToExport || subsToExport.length === 0) {
+        showToast('No student submissions found to export.', 'error');
+        return;
+      }
+
+      const maxQs = Math.max(...subsToExport.map(s => (s.questions ? s.questions.length : 4)));
+      let qHeaders = [];
+      for (let i = 1; i <= maxQs; i++) {
+        qHeaders.push(`Q${i}_Selected`, `Q${i}_CorrectAnswer`, `Q${i}_Result`);
+      }
+
+      const headers = [
+        'Student Name',
+        'Date & Time',
+        'Passage Title',
+        'Lexile Level',
+        'Score',
+        'Max Score',
+        'Percentage',
+        ...qHeaders
+      ];
+
+      const rows = subsToExport.map(s => {
+        const qDetails = (s.questions || []).flatMap((q) => {
+          const studentAnsIdx = s.answers[q.id];
+          const studentAnsLetter = studentAnsIdx !== undefined ? String.fromCharCode(65 + studentAnsIdx) : 'N/A';
+          const correctAnsLetter = String.fromCharCode(65 + q.correctAnswer);
+          const isRight = studentAnsIdx === q.correctAnswer ? 'CORRECT' : 'INCORRECT';
+          return [studentAnsLetter, correctAnsLetter, isRight];
+        });
+
+        return [
+          `"${(s.studentName || 'Anonymous').replace(/"/g, '""')}"`,
+          `"${s.timestamp}"`,
+          `"${s.passageTitle.replace(/"/g, '""')}"`,
+          `"${s.lexile}"`,
+          s.score,
+          s.maxScore,
+          `"${Math.round((s.score / s.maxScore) * 100)}%"`,
+          ...qDetails
+        ].join(',');
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `reading_assessment_results_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Downloaded Google Sheets CSV export!');
+    }
+
+    // Theme Helper
+    function getStudentThemeClasses() {
+      switch (state.studentTheme) {
+        case 'sepia':
+          return {
+            bg: 'bg-[#fbf0d9]',
+            card: 'bg-[#f4e7ce] border-[#e2d5b9]',
+            text: 'text-[#433422]',
+            subtext: 'text-[#7a6549]',
+            accent: 'border-[#c9b793]'
+          };
+        case 'dark':
+          return {
+            bg: 'bg-slate-950',
+            card: 'bg-slate-900 border-slate-800',
+            text: 'text-slate-100',
+            subtext: 'text-slate-400',
+            accent: 'border-slate-700'
+          };
+        default:
+          return {
+            bg: 'bg-slate-50',
+            card: 'bg-white border-slate-200',
+            text: 'text-slate-900',
+            subtext: 'text-slate-500',
+            accent: 'border-slate-200'
+          };
+      }
+    }
+
+    function getStudentFontCls() {
+      switch (state.studentFontSize) {
+        case 'small': return 'text-sm sm:text-base leading-relaxed';
+        case 'large': return 'text-lg sm:text-xl leading-loose';
+        default: return 'text-base sm:text-lg leading-relaxed';
+      }
+    }
+
+    // MAIN RENDER FUNCTION (NATIVE VANILLA DOM)
+    function renderApp() {
+      const app = document.getElementById('app');
       const themeCls = getStudentThemeClasses();
 
-      const getStudentFontCls = () => {
-        switch (studentFontSize) {
-          case 'small': return 'text-sm sm:text-base leading-relaxed';
-          case 'large': return 'text-lg sm:text-xl leading-loose';
-          default: return 'text-base sm:text-lg leading-relaxed';
-        }
-      };
-
-      return (
-        <div className={`min-h-screen flex flex-col ${activeTab === 'student' ? themeCls.bg : 'bg-slate-50'} text-slate-900`}>
-          {/* TOAST NOTIFICATION */}
-          {toast && (
-            <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-white flex items-center gap-3 ${
-              toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'
-            }`}>
-              <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
-              <span className="font-medium text-sm">{toast.msg}</span>
+      let html = `
+        <div class="min-h-screen flex flex-col ${state.activeTab === 'student' ? themeCls.bg : 'bg-slate-50'} text-slate-900">
+          
+          <!-- Toast Alert -->
+          ${state.toast ? `
+            <div class="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-white flex items-center gap-3 ${
+              state.toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'
+            }">
+              <span>${state.toast.type === 'error' ? '⚠️' : '✅'}</span>
+              <span class="font-medium text-sm">${state.toast.msg}</span>
             </div>
-          )}
+          ` : ''}
 
-          {/* HEADER NAV */}
-          <header className="bg-slate-900 text-white shadow-md no-print sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('config')}>
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-blue-400 flex items-center justify-center font-bold text-lg shadow">
+          <!-- Header Nav -->
+          <header class="bg-slate-900 text-white shadow-md no-print sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center space-x-3 cursor-pointer" onclick="setState({ activeTab: 'config' })">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-blue-400 flex items-center justify-center font-bold text-lg shadow">
                   📖
                 </div>
                 <div>
-                  <h1 className="font-bold text-lg leading-tight flex items-center gap-2 font-lexend">
+                  <h1 class="font-bold text-lg leading-tight flex items-center gap-2 font-lexend">
                     ReadCheck AI
-                    <span className="text-[10px] bg-indigo-500/30 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-400/30">
+                    <span class="text-[10px] bg-indigo-500/30 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-400/30">
                       Independent Evaluation
                     </span>
                   </h1>
-                  <p className="text-xs text-slate-400">Reading Assessment Generator</p>
+                  <p class="text-xs text-slate-400">Reading Assessment Generator</p>
                 </div>
               </div>
 
-              <nav className="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
-                <button
-                  onClick={() => setActiveTab('config')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
-                    activeTab === 'config' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  ⚙️ Generator
-                </button>
-                <button
-                  onClick={() => setActiveTab('print')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
-                    activeTab === 'print' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  📄 Printable View
-                </button>
-                <button
-                  onClick={() => setActiveTab('student')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
-                    activeTab === 'student' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  💻 Student Mode
-                </button>
-                <button
-                  onClick={() => setActiveTab('library')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
-                    activeTab === 'library' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  📊 Results ({submissions.length})
-                </button>
+              <nav class="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+                <button onclick="setState({ activeTab: 'config' })" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                  state.activeTab === 'config' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                }">⚙️ Generator</button>
+                <button onclick="setState({ activeTab: 'print' })" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                  state.activeTab === 'print' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                }">📄 Printable View</button>
+                <button onclick="setState({ activeTab: 'student' })" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                  state.activeTab === 'student' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                }">💻 Student Mode</button>
+                <button onclick="setState({ activeTab: 'library' })" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                  state.activeTab === 'library' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                }">📊 Results (${state.submissions.length})</button>
               </nav>
 
-              <button
-                onClick={() => setShowSettingsModal(true)}
-                className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <button onclick="setState({ showSettingsModal: true })" class="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>Teacher Settings</span>
               </button>
             </div>
           </header>
 
-          {/* MAIN CONTAINER */}
-          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+          <!-- Main Container -->
+          <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      `;
 
-            {/* 1. GENERATOR CONFIG VIEW */}
-            {activeTab === 'config' && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
-                  <div>
-                    <h2 className="text-xl font-extrabold text-slate-900 font-lexend flex items-center gap-2">
-                      <span>🎯</span> Assessment Configuration
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Set Lexile targets, text genres, topics, and Depth of Knowledge targets.
-                    </p>
-                  </div>
+      // 1. GENERATOR TAB
+      if (state.activeTab === 'config') {
+        html += `
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 font-lexend flex items-center gap-2">
+                  <span>🎯</span> Assessment Configuration
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">
+                  Set Lexile targets, text genres, topics, and Depth of Knowledge targets.
+                </p>
+              </div>
 
-                  {/* LEXILE SELECTOR */}
-                  <div className="space-y-2">
+              <!-- LEXILE BANDS -->
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">1. Lexile Target Range</label>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  ${LEXILE_BANDS.map(band => `
+                    <button type="button" onclick="setState({ lexile: '${band.id}' })" class="p-3 rounded-xl border text-left transition ${
+                      state.lexile === band.id
+                        ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }">
+                      <div class="font-bold text-xs text-slate-900">${band.label}</div>
+                      <div class="text-[10px] text-slate-500 mt-0.5">${band.grade}</div>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- GENRE & TOPIC -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">2. Text Genre</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    ${['Informational', 'Literary'].map(type => `
+                      <button type="button" onclick="setState({ textType: '${type}' })" class="py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                        state.textType === type
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }">${type}</button>
+                    `).join('')}
