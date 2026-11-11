@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reading Comprehension Assessment Generator</title>
   <style>
-    /* RESET & SYSTEM FONT STACK (100% Offline Compatible) */
+    /* RESET & SYSTEM FONT STACK (100% Offline & Firewall Compatible) */
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -32,7 +32,6 @@
       --emerald-50: #ecfdf5;
       --emerald-100: #d1fae5;
       --rose-600: #e11d48;
-      --rose-50: #fff1f2;
       --amber-400: #facc15;
       --amber-100: #fef3c7;
       --amber-900: #78350f;
@@ -99,9 +98,8 @@
 
     .grid { display: grid; }
     .grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 
-    /* UI COMPONENTS */
+    /* NAVIGATION HEADER */
     header {
       background-color: var(--slate-900);
       color: white;
@@ -127,7 +125,7 @@
       background: transparent;
       border: 1px solid transparent;
       color: var(--slate-300);
-      padding: 0.4rem 0.85rem;
+      padding: 0.45rem 0.9rem;
       border-radius: 8px;
       font-size: 0.85rem;
       font-weight: 600;
@@ -211,10 +209,11 @@
       color: var(--primary-text);
     }
 
-    /* LINE READER OVERLAY */
+    /* LINE READER OVERLAY MASK */
     .passage-wrapper {
       position: relative;
       user-select: none;
+      overflow: hidden;
     }
     .line-reader-bar {
       position: absolute;
@@ -222,14 +221,14 @@
       right: 0;
       pointer-events: none;
       z-index: 20;
-      transition: top 0.05s ease-out;
+      transition: top 0.04s ease-out;
       box-shadow: 0 -2000px 0 2000px rgba(15, 23, 42, 0.45), 0 2000px 0 2000px rgba(15, 23, 42, 0.45);
-      border-top: 2.5px solid var(--primary);
-      border-bottom: 2.5px solid var(--primary);
-      background-color: rgba(255, 255, 255, 0.12);
+      border-top: 2.5px solid var(--amber-400);
+      border-bottom: 2.5px solid var(--amber-400);
+      background-color: rgba(254, 240, 138, 0.15);
     }
 
-    /* QUESTION RADIO OPTIONS */
+    /* QUESTION OPTION LABELS */
     .option-label {
       display: flex;
       align-items: center;
@@ -250,28 +249,7 @@
       border-color: var(--primary);
     }
 
-    /* MODAL */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background-color: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      padding: 1rem;
-    }
-    .modal-content {
-      background: white;
-      border-radius: 16px;
-      max-width: 500px;
-      width: 100%;
-      padding: 1.5rem;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-    }
-
-    /* TOAST */
+    /* TOAST NOTIFICATION BANNER */
     #toast-banner {
       position: fixed;
       bottom: 1.5rem;
@@ -286,7 +264,7 @@
       display: none;
     }
 
-    /* PRINT STYLES */
+    /* PRINT STYLESHEET */
     @media print {
       .no-print { display: none !important; }
       body { background: white !important; color: black !important; }
@@ -309,7 +287,7 @@
 </head>
 <body>
 
-  <!-- HEADER NAVIGATION -->
+  <!-- HEADER NAVIGATION (No Settings Button) -->
   <header class="no-print">
     <div class="max-w-container flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -326,25 +304,21 @@
         <button onclick="switchTab('student')" id="tab-student" class="nav-btn">💻 Student Mode</button>
         <button onclick="switchTab('library')" id="tab-library" class="nav-btn">📊 Results Log</button>
       </nav>
-
-      <button onclick="toggleSettingsModal(true)" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.75rem;">
-        ⚙️ Settings Proxy
-      </button>
     </div>
   </header>
 
-  <!-- MAIN APP CONTAINER -->
+  <!-- MAIN APPLICATION CONTAINER -->
   <main class="max-w-container" style="padding-top: 1.5rem; padding-bottom: 2rem; flex: 1;">
 
-    <!-- 1. GENERATOR CONFIG TAB -->
+    <!-- 1. TEACHER GENERATOR CONFIG TAB -->
     <section id="view-config" class="view-panel">
       <div class="grid grid-2 gap-6">
         <div class="card space-y">
-          <h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem;">🎯 Assessment Configuration</h2>
-          <p style="font-size: 0.8rem; color: var(--slate-500); margin-bottom: 1.25rem;">Set Lexile bands, genres, and DOK question counts for passage generation.</p>
+          <h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem;">🎯 Assessment Generator</h2>
+          <p style="font-size: 0.8rem; color: var(--slate-500); margin-bottom: 1.25rem;">Select Lexile bands, genres, topics, and DOK levels for AI assessment generation.</p>
 
           <div style="margin-bottom: 1rem;">
-            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; margin-bottom: 0.4rem;">1. Target Lexile Level</label>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; margin-bottom: 0.4rem;">1. Target Lexile Range</label>
             <select id="select-lexile" class="form-control">
               <option value="400L-500L">400L - 500L (Grades 2 - 3)</option>
               <option value="600L-700L">600L - 700L (Grades 3 - 4)</option>
@@ -364,548 +338,25 @@
 
           <div style="margin-bottom: 1rem;">
             <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; margin-bottom: 0.4rem;">3. Custom Topic / Subject</label>
-            <input type="text" id="input-topic" class="form-control" placeholder="e.g. Desert Animal Adaptation, Space Exploration..." />
+            <input type="text" id="input-topic" class="form-control" placeholder="e.g. Ecosystems, Renewable Energy, Ancient Civilizations..." />
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; margin-bottom: 0.4rem;">4. Depth of Knowledge (DOK) Focus</label>
+            <select id="select-dok" class="form-control">
+              <option value="Balanced DOK 1-3">Balanced Mix (DOK 1, 2 & 3)</option>
+              <option value="DOK 1-2 Focus (Recall & Skills)">DOK 1-2 Focus (Recall & Basic Reasoning)</option>
+              <option value="DOK 3 Focus (Strategic Thinking)">DOK 3 Focus (Strategic Thinking & Analysis)</option>
+            </select>
           </div>
 
           <div style="margin-bottom: 1.5rem;">
             <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--slate-700); text-transform: uppercase; margin-bottom: 0.4rem;">
-              4. Question Count: <span id="lbl-qcount" style="color: var(--primary);">4 Questions</span>
+              5. Question Count: <span id="lbl-qcount" style="color: var(--primary);">4 Questions</span>
             </label>
             <input type="range" id="range-qcount" min="3" max="6" value="4" style="width: 100%; cursor: pointer;" oninput="document.getElementById('lbl-qcount').textContent = this.value + ' Questions'" />
           </div>
 
           <button onclick="generatePassage()" id="btn-generate" class="btn btn-primary" style="width: 100%; padding: 0.85rem;">
-            ✨ Generate Reading Assessment
-          </button>
-        </div>
-
-        <!-- PRE-LOADED SAMPLES -->
-        <div class="card">
-          <h3 style="font-size: 1rem; font-weight: 800; margin-bottom: 0.5rem;">📚 Instant Pre-Loaded Assessments</h3>
-          <p style="font-size: 0.8rem; color: var(--slate-500); margin-bottom: 1rem;">Select a verified offline reading passage to use instantly:</p>
-          <div id="sample-list" class="flex flex-col gap-3"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 2. PRINTABLE VIEW TAB -->
-    <section id="view-print" class="view-panel" style="display: none;">
-      <div class="no-print card flex items-center justify-between" style="margin-bottom: 1.5rem;">
-        <div>
-          <span style="font-size: 0.75rem; font-weight: 700; color: var(--slate-500);">CURRENT PASSAGE:</span>
-          <span id="print-lexile-tag" class="tag">800L-900L</span>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="toggleAnswerKey()" id="btn-toggle-key" class="btn btn-secondary">Include Teacher Answer Key</button>
-          <button onclick="window.print()" class="btn btn-primary">🖨️ Print Assessment</button>
-        </div>
-      </div>
-
-      <div class="card" style="max-width: 800px; margin: 0 auto;">
-        <!-- Header for Print -->
-        <div style="border-bottom: 2px solid var(--slate-900); padding-bottom: 1rem; margin-bottom: 1.5rem;" class="flex justify-between items-start">
-          <div>
-            <h1 style="font-size: 1.5rem; font-weight: 900;">Reading Comprehension Check</h1>
-            <p style="font-size: 0.75rem; color: var(--slate-600);">Independent Reading Assessment Standard</p>
-          </div>
-          <div style="text-align: right; font-size: 0.8rem; font-family: monospace;">
-            <div>Name: ___________________________</div>
-            <div style="margin-top: 0.3rem;">Date: ___________________________</div>
-            <div style="margin-top: 0.3rem;">Score: ________ / <span id="print-max-score">4</span></div>
-          </div>
-        </div>
-
-        <!-- Passage Text -->
-        <div style="margin-bottom: 2rem;">
-          <h2 id="print-title" style="font-size: 1.3rem; font-weight: 800; text-align: center; margin-bottom: 1rem;">The Mystery of Bird Migration</h2>
-          <div id="print-body" class="passage-font" style="font-size: 1.05rem; line-height: 1.7; color: var(--slate-800);"></div>
-        </div>
-
-        <!-- Questions -->
-        <div style="border-top: 1px solid var(--slate-200); padding-top: 1.5rem;">
-          <h3 style="font-size: 0.9rem; font-weight: 800; text-transform: uppercase; margin-bottom: 1rem;">Comprehension Questions</h3>
-          <div id="print-questions" class="flex flex-col gap-6"></div>
-        </div>
-
-        <!-- Optional Answer Key Page -->
-        <div id="print-answer-key" class="page-break" style="display: none; padding-top: 2rem; border-top: 2px solid var(--slate-900); margin-top: 3rem;">
-          <h3 style="font-size: 1.2rem; font-weight: 900; margin-bottom: 0.5rem;">🔑 Teacher Answer Key & Explanations</h3>
-          <p style="font-size: 0.8rem; color: var(--slate-500); margin-bottom: 1.5rem;">For scoring guidance and diagnostic feedback.</p>
-          <div id="print-key-list" class="flex flex-col gap-4"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. STUDENT MODE TAB -->
-    <section id="view-student" class="view-panel" style="display: none;">
-      <div id="student-container" class="card theme-light">
-        <!-- Controls Bar -->
-        <div class="no-print flex flex-wrap items-center justify-between gap-3" style="border-bottom: 1px solid var(--slate-200); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-          <div class="flex items-center gap-2">
-            <span class="tag" style="background-color: var(--emerald-100); color: var(--emerald-700);">Student Assessment Mode</span>
-            <span style="font-size: 0.75rem; color: var(--slate-500);">Independent Standard</span>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <input type="text" id="student-name" class="form-control" placeholder="Enter Full Name *" style="width: 180px;" />
-            
-            <button onclick="toggleLineReader()" id="btn-line-reader" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.75rem;">
-              🔍 Line Reader: OFF
-            </button>
-
-            <select id="student-font-size" onchange="updateStudentFormatting()" class="form-control" style="width: 100px; padding: 0.35rem 0.5rem; font-size: 0.75rem;">
-              <option value="font-sm">Small</option>
-              <option value="font-md" selected>Medium</option>
-              <option value="font-lg">Large</option>
-            </select>
-
-            <select id="student-theme" onchange="updateStudentFormatting()" class="form-control" style="width: 100px; padding: 0.35rem 0.5rem; font-size: 0.75rem;">
-              <option value="theme-light" selected>Light</option>
-              <option value="theme-sepia">Sepia</option>
-              <option value="theme-dark">Dark</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Active Test Area -->
-        <div id="student-test-area">
-          <h2 id="student-title" style="font-size: 1.4rem; font-weight: 800; margin-bottom: 1rem;"></h2>
-          
-          <div id="student-passage-wrapper" class="passage-wrapper card" style="margin-bottom: 2rem; padding: 1.5rem;" onmousemove="handleLineReaderMove(event)">
-            <div id="line-reader-overlay" class="line-reader-bar" style="display: none;"></div>
-            <div id="student-passage-body" class="passage-font font-md"></div>
-          </div>
-
-          <h3 style="font-size: 1rem; font-weight: 800; margin-bottom: 1rem;">Questions</h3>
-          <div id="student-questions-list" class="flex flex-col gap-6" style="margin-bottom: 2rem;"></div>
-
-          <button onclick="submitStudentAssessment()" class="btn btn-success" style="width: 100%; padding: 0.85rem; font-size: 1rem;">
-            🔒 Submit Assessment
-          </button>
-        </div>
-
-        <!-- Quiet Confirmation Area -->
-        <div id="student-confirm-area" style="display: none; text-align: center; padding: 3rem 1rem;">
-          <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
-          <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem;">Assessment Submitted Successfully</h2>
-          <p style="font-size: 0.875rem; color: var(--slate-500); margin-bottom: 1.5rem;">Your responses have been quietly recorded for your teacher.</p>
-          <button onclick="resetStudentTest()" class="btn btn-secondary">Take Another Assessment</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- 4. RESULTS LIBRARY TAB -->
-    <section id="view-library" class="view-panel" style="display: none;">
-      <div class="card space-y">
-        <div class="flex justify-between items-center" style="margin-bottom: 1.5rem;">
-          <div>
-            <h2 style="font-size: 1.2rem; font-weight: 800;">📊 Student Assessment Logs</h2>
-            <p style="font-size: 0.8rem; color: var(--slate-500);">Local history of completed student tests.</p>
-          </div>
-          <div class="flex gap-2">
-            <button onclick="exportCSV()" class="btn btn-success">📥 Export Results to CSV</button>
-            <button onclick="clearSubmissions()" class="btn btn-secondary" style="color: var(--rose-600);">Clear Log</button>
-          </div>
-        </div>
-
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
-            <thead>
-              <tr style="border-bottom: 2px solid var(--slate-200); color: var(--slate-600); font-family: monospace;">
-                <th style="padding: 0.75rem;">Student Name</th>
-                <th style="padding: 0.75rem;">Timestamp</th>
-                <th style="padding: 0.75rem;">Passage Title</th>
-                <th style="padding: 0.75rem;">Lexile</th>
-                <th style="padding: 0.75rem;">Score</th>
-                <th style="padding: 0.75rem;">Percentage</th>
-              </tr>
-            </thead>
-            <tbody id="library-table-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- TOAST ALERT -->
-  <div id="toast-banner"></div>
-
-  <!-- NATIVE JAVASCRIPT LOGIC (100% Self-Contained) -->
-  <script>
-    // DEMO PASSAGES (STRICTLY NO VOCABULARY GLOSSARY)
-    const DEMO_PASSAGES = [
-      {
-        id: 'demo-1',
-        title: 'The Mystery of Bird Migration',
-        lexile: '800L-900L',
-        passage: `Every autumn, millions of migratory birds embark on an extraordinary journey across continents. Spanning thousands of miles, this seasonal movement takes them from northern breeding grounds to warmer southern wintering habitats. What makes this journey truly remarkable is their precise navigation ability. Birds utilize a combination of environmental cues to stay on course, including the position of the sun during the day, star patterns at night, and Earth's invisible magnetic field.\n\nScientists have discovered that special proteins in the eyes of migratory birds allow them to perceive magnetic force lines like an internal compass. Along their flight paths, these travelers stop at specific wetland habitats to feed and restore vital energy reserves. Maintaining these stopover sites is critical for bird conservation, as habitat loss along migration corridors can severely diminish bird populations worldwide.\n\nThrough instincts passed down across generations, young birds navigate these treacherous global routes for the very first time without adult guidance, ensuring the long-term survival of their species.`,
-        questions: [
-          {
-            id: 1,
-            question: 'What do birds use to navigate during their migration?',
-            options: ['Weather maps and wind directions', 'The sun, star patterns, and magnetic fields', 'Landmarks like highways and rivers', 'Audio signals from other species'],
-            correctAnswer: 1,
-            explanation: 'The text states birds use the sun, star patterns, and Earth magnetic field.'
-          },
-          {
-            id: 2,
-            question: 'Why are stopover wetland habitats important for migratory birds?',
-            options: ['They serve as permanent nesting locations.', 'Birds stop there to feed and rebuild energy reserves.', 'They provide shelter from summer heat.', 'Birds use them to learn navigation from adults.'],
-            correctAnswer: 1,
-            explanation: 'Paragraph 2 explains stopover sites are necessary for feeding and energy restoration.'
-          },
-          {
-            id: 3,
-            question: 'What does the word "diminish" mean as used in paragraph 2?',
-            options: ['To increase rapidly', 'To reduce or shrink', 'To protect completely', 'To observe closely'],
-            correctAnswer: 1,
-            explanation: 'In context, losing stopover habitats causes bird numbers to drop or shrink.'
-          }
-        ]
-      },
-      {
-        id: 'demo-2',
-        title: 'Echoes of Red Rock Canyon',
-        lexile: '600L-700L',
-        passage: `The dry afternoon breeze rustled through the juniper trees as Leo adjusted his water canteen. Behind him, his cousin Sam pointed toward a deep shadow stretching across the canyon wall.\n\n"Look up there, Leo!" Sam exclaimed. "There’s a small ledge carved into the rock."\n\nCurious, Leo scrambled up the dusty embankment. Tucked inside a shallow niche was a stack of smooth river stones—a trail cairn left long ago. Between two granite stones rested a small brass cylinder sealed with beeswax.\n\nInside was a rolled slip of thick parchment. Unfolding it gently, they saw a hand-drawn map of the canyon with a small compass star in the corner. A faint pencil line led toward a hidden spring near Pine Creek. Both boys knew their quiet weekend hike had just turned into an exciting mystery.`,
-        questions: [
-          {
-            id: 1,
-            question: 'What did Leo find inside the brass cylinder?',
-            options: ['A small silver key', 'A hand-drawn map on thick parchment', 'An old coin', 'A written diary entry'],
-            correctAnswer: 1,
-            explanation: 'Paragraph 4 states that a rolled slip of parchment containing a map was inside.'
-          },
-          {
-            id: 2,
-            question: 'What is a "niche" as used in paragraph 3?',
-            options: ['A deep underground cave', 'A shallow recess or hollow space in a rock wall', 'A wooden box', 'A high tree branch'],
-            correctAnswer: 1,
-            explanation: 'In context, a niche is a hollow space in the rock wall holding the stones.'
-          }
-        ]
-      }
-    ];
-
-    // APPLICATION STATE
-    let state = {
-      activeTab: 'config',
-      webhookUrl: localStorage.getItem('readcheck_webhook_url') || 'https://script.google.com/a/macros/smithcoedu.net/s/AKfycbzxDDhxEVpIKogPr-UwALw-yMShLQSW6heDU39MjzXlxgpvwViST9OBdlC5v_REQfnI/exec',
-      currentPassage: DEMO_PASSAGES[0],
-      studentAnswers: {},
-      studentName: '',
-      lineReaderActive: false,
-      lineReaderY: 100,
-      showAnswerKey: false,
-      submissions: JSON.parse(localStorage.getItem('readcheck_submissions_log') || '[]')
-    };
-
-    // TAB NAVIGATION
-    function switchTab(tabId) {
-      state.activeTab = tabId;
-      document.querySelectorAll('.view-panel').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-
-      document.getElementById(`view-${tabId}`).style.display = 'block';
-      document.getElementById(`tab-${tabId}`).classList.add('active');
-
-      if (tabId === 'print') renderPrintView();
-      if (tabId === 'student') renderStudentView();
-      if (tabId === 'library') renderLibraryView();
-    }
-
-    // TOAST NOTIFIER
-    function showToast(msg, isError = false) {
-      const banner = document.getElementById('toast-banner');
-      banner.textContent = msg;
-      banner.style.backgroundColor = isError ? 'var(--rose-600)' : 'var(--emerald-600)';
-      banner.style.display = 'block';
-      setTimeout(() => { banner.style.display = 'none'; }, 3500);
-    }
-
-    // RENDER SAMPLES
-    function renderSamples() {
-      const list = document.getElementById('sample-list');
-      list.innerHTML = DEMO_PASSAGES.map(p => `
-        <div onclick="selectSample('${p.id}')" style="padding: 0.85rem; border: 1px solid var(--slate-200); border-radius: 10px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--slate-200)'">
-          <div class="flex justify-between items-center">
-            <strong style="font-size: 0.85rem;">${p.title}</strong>
-            <span class="tag">${p.lexile}</span>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function selectSample(id) {
-      const found = DEMO_PASSAGES.find(p => p.id === id);
-      if (found) {
-        state.currentPassage = found;
-        state.studentAnswers = {};
-        switchTab('print');
-        showToast(`Loaded: "${found.title}"`);
-      }
-    }
-
-    // GENERATE PASSAGE VIA APPS SCRIPT WEBHOOK PROXY
-    async function generatePassage() {
-      const btn = document.getElementById('btn-generate');
-      const lexile = document.getElementById('select-lexile').value;
-      const genre = document.getElementById('select-genre').value;
-      const topic = document.getElementById('input-topic').value.trim() || 'Nature and Science';
-      const qCount = document.getElementById('range-qcount').value;
-
-      btn.disabled = true;
-      btn.textContent = '⏳ Contacting Proxy Backend...';
-
-      const promptText = `Generate a ${genre} reading passage at a ${lexile} Lexile level about '${topic}'. Length: ~225 words. 
-STRICT REQUIREMENT: Do NOT include any vocabulary glossary or definition list. 
-Provide ${qCount} multiple choice comprehension questions with 4 options each (correctAnswer index 0-3) and brief explanations.
-Return ONLY valid JSON with format:
-{
-  "title": "Title",
-  "lexile": "${lexile}",
-  "passage": "Passage text...",
-  "questions": [
-    { "id": 1, "question": "Q?", "options": ["A", "B", "C", "D"], "correctAnswer": 0, "explanation": "Why..." }
-  ]
-}`;
-
-      let generated = null;
-
-      if (state.webhookUrl) {
-        try {
-          const res = await fetch(state.webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'generate', prompt: promptText })
-          });
-          const data = await res.json();
-          let jsonStr = typeof data === 'string' ? data : (data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data));
-          jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-          generated = JSON.parse(jsonStr);
-        } catch (err) {
-          console.warn("Proxy call failed, loading demo fallback:", err);
-        }
-      }
-
-      if (!generated) {
-        showToast('Webhook unavailable. Loaded sample passage.', true);
-        generated = DEMO_PASSAGES[Math.floor(Math.random() * DEMO_PASSAGES.length)];
-      } else {
-        showToast('Passage generated successfully!');
-      }
-
-      delete generated.vocabulary;
-      state.currentPassage = generated;
-      state.studentAnswers = {};
-      btn.disabled = false;
-      btn.textContent = '✨ Generate Reading Assessment';
-      switchTab('print');
-    }
-
-    // RENDER PRINT VIEW
-    function renderPrintView() {
-      const p = state.currentPassage;
-      document.getElementById('print-lexile-tag').textContent = p.lexile;
-      document.getElementById('print-title').textContent = p.title;
-      document.getElementById('print-max-score').textContent = p.questions.length;
-      document.getElementById('print-body').innerHTML = p.passage.split('\n\n').map(par => `<p style="margin-bottom: 0.85rem; text-indent: 1.5rem;">${par}</p>`).join('');
-
-      document.getElementById('print-questions').innerHTML = p.questions.map((q, idx) => `
-        <div>
-          <p style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.4rem;">${idx + 1}. ${q.question}</p>
-          <div class="grid grid-2 gap-2" style="padding-left: 0.5rem;">
-            ${q.options.map((opt, oIdx) => `
-              <div style="font-size: 0.85rem;" class="flex items-center">
-                <span class="bubble-circle">${String.fromCharCode(65 + oIdx)}</span>
-                <span>${opt}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('');
-
-      document.getElementById('print-key-list').innerHTML = p.questions.map((q, idx) => `
-        <div style="padding: 0.75rem; border: 1px solid var(--slate-200); border-radius: 8px; font-size: 0.85rem;">
-          <strong>Q${idx + 1}: ${String.fromCharCode(65 + q.correctAnswer)}</strong> — ${q.options[q.correctAnswer]}
-          <p style="color: var(--slate-600); font-style: italic; margin-top: 0.2rem;">${q.explanation || ''}</p>
-        </div>
-      `).join('');
-    }
-
-    function toggleAnswerKey() {
-      state.showAnswerKey = !state.showAnswerKey;
-      document.getElementById('print-answer-key').style.display = state.showAnswerKey ? 'block' : 'none';
-      document.getElementById('btn-toggle-key').textContent = state.showAnswerKey ? 'Hide Teacher Answer Key' : 'Include Teacher Answer Key';
-    }
-
-    // RENDER STUDENT VIEW
-    function renderStudentView() {
-      const p = state.currentPassage;
-      document.getElementById('student-title').textContent = p.title;
-      document.getElementById('student-passage-body').innerHTML = p.passage.split('\n\n').map(par => `<p style="margin-bottom: 0.85rem;">${par}</p>`).join('');
-
-      document.getElementById('student-questions-list').innerHTML = p.questions.map((q, idx) => `
-        <div class="card" style="padding: 1rem;">
-          <p style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem;">${idx + 1}. ${q.question}</p>
-          <div class="flex flex-col gap-2">
-            ${q.options.map((opt, oIdx) => `
-              <label class="option-label ${state.studentAnswers[q.id] === oIdx ? 'selected' : ''}" onclick="selectStudentAnswer(${q.id}, ${oIdx})">
-                <input type="radio" name="sq-${q.id}" ${state.studentAnswers[q.id] === oIdx ? 'checked' : ''} style="display: none;" />
-                <span><b>${String.fromCharCode(65 + oIdx)}.</b> ${opt}</span>
-              </label>
-            `).join('')}
-          </div>
-        </div>
-      `).join('');
-
-      updateStudentFormatting();
-    }
-
-    function selectStudentAnswer(qId, oIdx) {
-      state.studentAnswers[qId] = oIdx;
-      renderStudentView();
-    }
-
-    function updateStudentFormatting() {
-      const container = document.getElementById('student-container');
-      const body = document.getElementById('student-passage-body');
-      
-      const theme = document.getElementById('student-theme').value;
-      const size = document.getElementById('student-font-size').value;
-
-      container.className = `card ${theme}`;
-      body.className = `passage-font ${size}`;
-    }
-
-    function toggleLineReader() {
-      state.lineReaderActive = !state.lineReaderActive;
-      document.getElementById('line-reader-overlay').style.display = state.lineReaderActive ? 'block' : 'none';
-      document.getElementById('btn-line-reader').textContent = `🔍 Line Reader: ${state.lineReaderActive ? 'ON' : 'OFF'}`;
-    }
-
-    function handleLineReaderMove(e) {
-      if (!state.lineReaderActive) return;
-      const wrapper = document.getElementById('student-passage-wrapper');
-      const rect = wrapper.getBoundingClientRect();
-      const y = e.clientY - rect.top;
-      document.getElementById('line-reader-overlay').style.top = `${Math.max(10, Math.min(y - 20, rect.height - 30))}px`;
-    }
-
-    // SUBMIT STUDENT ASSESSMENT
-    function submitStudentAssessment() {
-      const name = document.getElementById('student-name').value.trim();
-      if (!name) {
-        showToast('Please enter your name before submitting.', true);
-        return;
-      }
-
-      let score = 0;
-      state.currentPassage.questions.forEach(q => {
-        if (state.studentAnswers[q.id] === q.correctAnswer) score++;
-      });
-
-      const record = {
-        studentName: name,
-        timestamp: new Date().toLocaleString(),
-        passageTitle: state.currentPassage.title,
-        lexile: state.currentPassage.lexile,
-        score: score,
-        maxScore: state.currentPassage.questions.length
-      };
-
-      state.submissions.unshift(record);
-      localStorage.setItem('readcheck_submissions_log', JSON.stringify(state.submissions));
-
-      if (state.webhookUrl) {
-        fetch(state.webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'submitResults', ...record })
-        }).catch(err => console.warn('Background log failed:', err));
-      }
-
-      document.getElementById('student-test-area').style.display = 'none';
-      document.getElementById('student-confirm-area').style.display = 'block';
-    }
-
-    function resetStudentTest() {
-      state.studentAnswers = {};
-      document.getElementById('student-test-area').style.display = 'block';
-      document.getElementById('student-confirm-area').style.display = 'none';
-      renderStudentView();
-    }
-
-    // RENDER LIBRARY & EXPORT CSV
-    function renderLibraryView() {
-      const tbody = document.getElementById('library-table-body');
-      if (state.submissions.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--slate-400);">No student assessments logged yet.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = state.submissions.map(s => `
-        <tr style="border-bottom: 1px solid var(--slate-100);">
-          <td style="padding: 0.75rem; font-weight: 700;">${s.studentName}</td>
-          <td style="padding: 0.75rem; color: var(--slate-500); font-family: monospace;">${s.timestamp}</td>
-          <td style="padding: 0.75rem;">${s.passageTitle}</td>
-          <td style="padding: 0.75rem; font-family: monospace;">${s.lexile}</td>
-          <td style="padding: 0.75rem; font-weight: 700; color: var(--primary);">${s.score} / ${s.maxScore}</td>
-          <td style="padding: 0.75rem;">
-            <span class="tag" style="background-color: ${(s.score / s.maxScore) >= 0.75 ? 'var(--emerald-100)' : 'var(--amber-100)'}; color: ${(s.score / s.maxScore) >= 0.75 ? 'var(--emerald-700)' : 'var(--amber-900)'};">
-              ${Math.round((s.score / s.maxScore) * 100)}%
-            </span>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    function exportCSV() {
-      if (state.submissions.length === 0) {
-        showToast('No records to export.', true);
-        return;
-      }
-      const headers = ['Student Name', 'Timestamp', 'Passage Title', 'Lexile', 'Score', 'Max Score', 'Percentage'];
-      const rows = state.submissions.map(s => [
-        `"${s.studentName}"`, `"${s.timestamp}"`, `"${s.passageTitle}"`, `"${s.lexile}"`, s.score, s.maxScore, `"${Math.round((s.score / s.maxScore) * 100)}%"`
-      ]);
-
-      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const link = document.createElement('a');
-      link.setAttribute('href', encodeURI(csvContent));
-      link.setAttribute('download', `reading_assessment_results_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast('Exported CSV File!');
-    }
-
-    function clearSubmissions() {
-      state.submissions = [];
-      localStorage.removeItem('readcheck_submissions_log');
-      renderLibraryView();
-      showToast('Logs cleared.');
-    }
-
-    // SETTINGS MODAL HANDLERS
-    function toggleSettingsModal(show) {
-      document.getElementById('settings-modal').style.display = show ? 'flex' : 'none';
-      if (show) document.getElementById('input-webhook').value = state.webhookUrl;
-    }
-
-    function saveSettings() {
-      state.webhookUrl = document.getElementById('input-webhook').value.trim();
-      localStorage.setItem('readcheck_webhook_url', state.webhookUrl);
-      toggleSettingsModal(false);
-      showToast('Settings saved.');
-    }
-
-    // INIT APP
-    document.addEventListener('DOMContentLoaded', () => {
-      renderSamples();
-      renderPrintView();
-    });
-  </script>
-</body>
-</html>
+            ✨ Generate Assessment
+          </button
