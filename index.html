@@ -3,404 +3,595 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reading Comprehension Check Generator</title>
+  <title>Reading Comprehension Assessment Generator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- React & ReactDOM 18 UMD -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Standalone for JSX Compilation (Must be type="text/babel") -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
-    @media print {
-      .no-print { display: none !important; }
-      .print-only { display: block !important; }
-      body { background: white; color: black; font-size: 12pt; }
-      .page-break { page-break-after: always; }
+    body {
+      font-family: 'Inter', sans-serif;
     }
-    .line-reader-overlay {
-      position: absolute;
-      left: 0; right: 0;
-      background: rgba(254, 240, 138, 0.35);
-      border-top: 2px solid #ca8a04;
-      border-bottom: 2px solid #ca8a04;
-      pointer-events: none;
-      transition: top 0.05s ease-out;
-      z-index: 20;
+    .font-lexend {
+      font-family: 'Lexend', sans-serif;
+    }
+    .serif-passage {
+      font-family: 'Merriweather', Georgia, serif;
+    }
+
+    /* Print Stylesheet Optimization */
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      body {
+        background-color: white !important;
+        color: black !important;
+        font-size: 11pt !important;
+      }
+      .print-container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .page-break {
+        page-break-before: always !important;
+      }
+      .bubble-option {
+        border: 1.5px solid #000 !important;
+      }
+    }
+    @media screen {
+      .print-only {
+        display: none !important;
+      }
     }
   </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800">
+<body class="bg-slate-50 text-slate-900 min-h-screen">
   <div id="root"></div>
 
-  <script type="babel">
-    // SET YOUR GOOGLE APPS SCRIPT WEBHOOK URL HERE
-    const DEFAULT_WEBHOOK_URL = "PASTE_YOUR_APPS_SCRIPT_WEBHOOK_URL_HERE";
+  <!-- Note: type="text/babel" is MANDATORY for Babel standalone compilation -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
 
-    const DEMO_PASSAGE = {
-      title: "The Mystery of Migration",
-      lexile: "800L-900L",
-      text: "Every autumn, millions of monarch butterflies embark on an extraordinary journey across North America. Spanning thousands of miles, this migration takes them from Canada and the northern United States down to the warm pine forests of central Mexico. What makes this journey truly remarkable is that no single butterfly completes the entire round trip. Instead, it takes four successive generations to fulfill the annual cycle. The butterflies rely on environmental cues such as declining daylight hours and cooling temperatures to signal when it is time to head south. Along their flight path, they depend heavily on flowering plants for nectar to sustain their energy.",
-      questions: [
-        {
-          id: 1,
-          question: "Where do monarch butterflies travel during their autumn migration?",
-          options: ["From Mexico to Canada", "From Canada/US to central Mexico", "Across the Atlantic Ocean", "To South America"],
-          correctIndex: 1,
-          explanation: "The passage states that they travel from Canada and the northern US down to central Mexico."
-        },
-        {
-          id: 2,
-          question: "Why is the migration described as 'remarkable' in the passage?",
-          options: ["They fly faster than birds", "No single butterfly completes the entire round trip", "They do not need food during the trip", "They travel only at night"],
-          correctIndex: 1,
-          explanation: "The text explains that four successive generations complete the cycle."
-        }
-      ]
-    };
+    // PRE-LOADED DEMO PASSAGES (STRICTLY NO VOCABULARY GLOSSARY)
+    const DEMO_PASSAGES = [
+      {
+        id: 'demo-1',
+        title: 'The Mystery of Bird Migration',
+        lexile: '800L-900L (Grades 4-5)',
+        textType: 'Informational',
+        wordCount: 228,
+        summary: 'An exploration of how migratory birds navigate thousands of miles across Earth using environmental cues.',
+        passage: `Every autumn, millions of migratory birds embark on an extraordinary journey across continents. Spanning thousands of miles, this seasonal movement takes them from northern breeding grounds to warmer southern wintering habitats. What makes this journey truly remarkable is their precise navigation ability. Birds utilize a combination of environmental cues to stay on course, including the position of the sun during the day, star patterns at night, and Earth's invisible magnetic field.
+
+Scientists have discovered that special proteins in the eyes of migratory birds allow them to perceive magnetic force lines like an internal compass. Along their flight paths, these travelers stop at specific wetland habitats to feed and restore vital energy reserves. Maintaining these stopover sites is critical for bird conservation, as habitat loss along migration corridors can severely diminish bird populations worldwide.
+
+Through instincts passed down across generations, young birds navigate these treacherous global routes for the very first time without adult guidance, ensuring the long-term survival of their species.`,
+        questions: [
+          {
+            id: 1,
+            type: 'Literal',
+            question: 'What do birds use to navigate during their migration?',
+            options: [
+              'Weather maps and wind directions',
+              'The sun, star patterns, and magnetic fields',
+              'Landmarks like highways and rivers',
+              'Audio signals from other animal species'
+            ],
+            correctAnswer: 1,
+            explanation: 'The passage explicitly lists the sun, star patterns at night, and Earth’s magnetic field as navigation tools.'
+          },
+          {
+            id: 2,
+            type: 'Inferential',
+            question: 'What would most likely happen if stopover wetland habitats were destroyed?',
+            options: [
+              'Birds would stop migrating altogether.',
+              'Birds would struggle to survive because they could not refuel energy.',
+              'Birds would build nests earlier in the spring.',
+              'Birds would migrate exclusively during daylight hours.'
+            ],
+            correctAnswer: 1,
+            explanation: 'The text notes that stopover sites are necessary for birds to feed and restore energy needed to finish their flight.'
+          },
+          {
+            id: 3,
+            type: 'Evaluative',
+            question: 'Why did the author include information about young birds flying without adults?',
+            options: [
+              'To prove that adult birds are poor parents.',
+              'To emphasize how powerful natural migratory instincts are.',
+              'To argue that young birds fly faster than adult birds.',
+              'To show that bird migrations happen by accident.'
+            ],
+            correctAnswer: 1,
+            explanation: 'Highlighting that young birds navigate complex routes alone demonstrates that migratory ability is an inherited instinct.'
+          },
+          {
+            id: 4,
+            type: 'Context Clues',
+            question: 'What does the word "diminish" mean in paragraph 2: "severely diminish bird populations"?',
+            options: ['Increase', 'Reduce or shrink', 'Protect', 'Observe'],
+            correctAnswer: 1,
+            explanation: 'In context, losing stopover habitats reduces or shrinks the total number of surviving birds.'
+          }
+        ]
+      },
+      {
+        id: 'demo-2',
+        title: 'Echoes of the Red Rock Canyon',
+        lexile: '600L-700L (Grades 3-4)',
+        textType: 'Literary',
+        wordCount: 215,
+        summary: 'Leo and Sam uncover an old trail marker hidden along a canyon wall while exploring.',
+        passage: `The dry afternoon breeze rustled through the juniper trees as Leo adjusted his water canteen. Behind him, his cousin Sam pointed toward a deep shadow stretching across the canyon wall.
+
+"Look up there, Leo!" Sam exclaimed. "There’s a small ledge carved into the rock."
+
+Curious, Leo scrambled up the dusty embankment. Tucked inside a shallow niche was a stack of smooth river stones—a trail cairn left long ago. Between two granite stones rested a small brass cylinder sealed with beeswax.
+
+"Is it a secret message?" Sam whispered, scrambling up beside him.
+
+Leo carefully twisted the brass cap. Inside was a rolled slip of thick parchment. Unfolding it gently, they saw a hand-drawn map of the canyon with a small compass star in the corner. A faint pencil line led toward a hidden spring near Pine Creek.
+
+The sun was dropping behind the western ridges, signaling that night was near. Leo carefully slid the map back inside his pocket. They needed to return to their family's campsite before dark, but both boys knew their quiet weekend hike had just turned into an exciting mystery.`,
+        questions: [
+          {
+            id: 1,
+            type: 'Literal',
+            question: 'What did Leo find inside the brass cylinder?',
+            options: [
+              'A small iron key',
+              'A hand-drawn map on thick parchment',
+              'A shiny silver coin',
+              'A collection of dried leaves'
+            ],
+            correctAnswer: 1,
+            explanation: 'Paragraph 5 states that inside the cylinder was a rolled slip of parchment containing a hand-drawn map.'
+          },
+          {
+            id: 2,
+            type: 'Inferential',
+            question: 'Why did the boys decide to head back to camp instead of following the map immediately?',
+            options: [
+              'They lost interest in the map.',
+              'The sun was setting and daylight was fading.',
+              'It started raining heavily in the canyon.',
+              'They were out of drinking water.'
+            ],
+            correctAnswer: 1,
+            explanation: 'The passage mentions the sun dropping behind the ridges and the need to return before dark.'
+          },
+          {
+            id: 3,
+            type: 'Context Clues',
+            question: 'What does the word "niche" mean as used in paragraph 3?',
+            options: [
+              'A deep underground cave',
+              'A shallow hollow or recess in a wall',
+              'A wooden storage box',
+              'A high mountain peak'
+            ],
+            correctAnswer: 1,
+            explanation: 'In context, a niche is a small hollowed space in the rock wall where the cairn was tucked.'
+          }
+        ]
+      }
+    ];
+
+    const LEXILE_BANDS = [
+      { id: '400L-500L', label: '400L - 500L', grade: 'Grades 2 - 3 (Primary)' },
+      { id: '600L-700L', label: '600L - 700L', grade: 'Grades 3 - 4 (Elementary)' },
+      { id: '800L-900L', label: '800L - 900L', grade: 'Grades 4 - 5 (Upper Elem)' },
+      { id: '1000L-1100L', label: '1000L - 1100L', grade: 'Grades 6 - 8 (Middle School)' },
+      { id: '1100L+', label: '1100L+', grade: 'Grades 9 - 12+ (High School)' }
+    ];
 
     function App() {
-      const [view, setView] = React.useState('teacher');
-      const [webhookUrl, setWebhookUrl] = React.useState(() => localStorage.getItem('app_script_url') || DEFAULT_WEBHOOK_URL);
-      const [showSettings, setShowSettings] = React.useState(false);
-      const [loading, setLoading] = React.useState(false);
-      const [errorMsg, setErrorMsg] = React.useState('');
+      // Configuration & Settings State
+      const [lexile, setLexile] = useState('800L-900L');
+      const [textType, setTextType] = useState('Informational');
+      const [topic, setTopic] = useState('');
+      const [numQuestions, setNumQuestions] = useState(4);
+      const [dokTypes, setDokTypes] = useState(['Literal', 'Inferential', 'Evaluative', 'Context Clues']);
       
-      // Generator parameters
-      const [lexile, setLexile] = React.useState('800L-900L');
-      const [genre, setGenre] = React.useState('Informational');
-      const [topic, setTopic] = React.useState('Animal Adaptation');
-      const [questionCount, setQuestionCount] = React.useState(4);
-      const [dokLevel, setDokLevel] = React.useState('Balanced');
-      
-      // Current Passage Data
-      const [passage, setPassage] = React.useState(DEMO_PASSAGE);
-      
-      // Student Mode State
-      const [studentAnswers, setStudentAnswers] = React.useState({});
-      const [studentName, setStudentName] = React.useState('');
-      const [submitted, setSubmitted] = React.useState(false);
-      const [fontSize, setFontSize] = React.useState('text-base');
-      const [theme, setTheme] = React.useState('light');
-      
-      // Line Reader
-      const [lineReaderActive, setLineReaderActive] = React.useState(false);
-      const [linePos, setLinePos] = React.useState(0);
-      const passageRef = React.useRef(null);
+      const [webhookUrl, setWebhookUrl] = useState(() => {
+        return localStorage.getItem('readcheck_webhook_url') || '';
+      });
+      const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-      React.useEffect(() => {
-        localStorage.setItem('app_script_url', webhookUrl);
+      // App Tab View: 'config' | 'print' | 'student' | 'library'
+      const [activeTab, setActiveTab] = useState('config');
+      const [passageData, setPassageData] = useState(DEMO_PASSAGES[0]);
+      const [loading, setLoading] = useState(false);
+      const [loadingMessage, setLoadingMessage] = useState('');
+      const [toast, setToast] = useState(null);
+
+      // Student Mode Assessment State
+      const [studentName, setStudentName] = useState('');
+      const [studentAnswers, setStudentAnswers] = useState({});
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [submittedResult, setSubmittedResult] = useState(null);
+
+      // Student View Reader Controls
+      const [lineReaderActive, setLineReaderActive] = useState(false);
+      const [lineReaderY, setLineReaderY] = useState(120);
+      const [studentTheme, setStudentTheme] = useState('light'); // 'light' | 'sepia' | 'dark'
+      const [studentFontSize, setStudentFontSize] = useState('medium'); // 'small' | 'medium' | 'large'
+      const passageBoxRef = useRef(null);
+
+      // Print Controls
+      const [printShowKey, setPrintShowKey] = useState(false);
+
+      // Persistent Storage
+      const [submissions, setSubmissions] = useState(() => {
+        const saved = localStorage.getItem('readcheck_submissions_log');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      useEffect(() => {
+        localStorage.setItem('readcheck_webhook_url', webhookUrl);
       }, [webhookUrl]);
 
-      const handleMouseMove = (e) => {
-        if (!lineReaderActive || !passageRef.current) return;
-        const rect = passageRef.current.getBoundingClientRect();
-        const relativeY = e.clientY - rect.top;
-        if (relativeY >= 0 && relativeY <= rect.height) {
-          setLinePos(relativeY - 16);
-        }
+      const showToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3800);
       };
 
-      const generatePassage = async () => {
-        if (!webhookUrl || webhookUrl.includes("PASTE_YOUR")) {
-          setErrorMsg("Please enter your Google Apps Script Webhook URL in Teacher Settings!");
-          setShowSettings(true);
+      // Mouse position tracker for visual line reader bar
+      const handlePassageMouseMove = (e) => {
+        if (!lineReaderActive || !passageBoxRef.current) return;
+        const rect = passageBoxRef.current.getBoundingClientRect();
+        const yPos = e.clientY - rect.top;
+        setLineReaderY(Math.max(20, Math.min(yPos, rect.height - 20)));
+      };
+
+      // CSV Data Exporter for Google Sheets
+      const exportSubmissionsToCSV = (subsToExport = submissions) => {
+        if (!subsToExport || subsToExport.length === 0) {
+          showToast('No student submissions found to export.', 'error');
           return;
         }
 
-        setLoading(true);
-        setErrorMsg('');
+        const maxQs = Math.max(...subsToExport.map(s => (s.questions ? s.questions.length : 4)));
+        let qHeaders = [];
+        for (let i = 1; i <= maxQs; i++) {
+          qHeaders.push(`Q${i}_Selected`, `Q${i}_CorrectAnswer`, `Q${i}_Result`);
+        }
 
-        const promptText = `Generate a ${genre} reading passage at a ${lexile} Lexile level about '${topic}'. Length: ~225 words. Do NOT include any vocabulary glossary or definition list. Provide ${questionCount} multiple-choice comprehension questions with 4 options each (labeled index 0-3), depth of knowledge focus: ${dokLevel}.
+        const headers = [
+          'Student Name',
+          'Date & Time',
+          'Passage Title',
+          'Lexile Level',
+          'Score',
+          'Max Score',
+          'Percentage',
+          ...qHeaders
+        ];
+
+        const rows = subsToExport.map(s => {
+          const qDetails = (s.questions || []).flatMap((q) => {
+            const studentAnsIdx = s.answers[q.id];
+            const studentAnsLetter = studentAnsIdx !== undefined ? String.fromCharCode(65 + studentAnsIdx) : 'N/A';
+            const correctAnsLetter = String.fromCharCode(65 + q.correctAnswer);
+            const isRight = studentAnsIdx === q.correctAnswer ? 'CORRECT' : 'INCORRECT';
+            return [studentAnsLetter, correctAnsLetter, isRight];
+          });
+
+          return [
+            `"${(s.studentName || 'Anonymous').replace(/"/g, '""')}"`,
+            `"${s.timestamp}"`,
+            `"${s.passageTitle.replace(/"/g, '""')}"`,
+            `"${s.lexile}"`,
+            s.score,
+            s.maxScore,
+            `"${Math.round((s.score / s.maxScore) * 100)}%"`,
+            ...qDetails
+          ].join(',');
+        });
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `reading_assessment_results_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Downloaded Google Sheets CSV export!');
+      };
+
+      // CORS-Safe Post Payload to Google Apps Script Proxy
+      const sendToAppsScriptProxy = async (payloadData) => {
+        if (!webhookUrl.trim()) return null;
+        try {
+          // Using text/plain prevents CORS preflight OPTIONS requests from being blocked by Google
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payloadData)
+          });
+          if (res.ok) {
+            const text = await res.text();
+            try {
+              return JSON.parse(text);
+            } catch (e) {
+              return text;
+            }
+          }
+        } catch (err) {
+          console.warn('Apps Script Webhook request error:', err);
+        }
+        return null;
+      };
+
+      // Generator Action
+      const handleGeneratePassage = async () => {
+        setLoading(true);
+        setLoadingMessage('Communicating with Proxy Webhook to generate passage...');
+
+        const promptText = `Generate a ${textType} reading passage calibrated strictly to ${lexile} Lexile level about '${topic || 'an age-appropriate topic'}'. 
+Passage target word count: ~225 words. 
+Generate ${numQuestions} multiple choice questions focusing on Depth of Knowledge: ${dokTypes.join(', ')}.
+
+CRITICAL REQUIREMENT: Strictly DO NOT include any vocabulary glossary, word list, or definition key anywhere in the output.
+
 Return ONLY valid JSON matching this structure:
 {
-  "title": "Title",
+  "title": "Passage Title",
   "lexile": "${lexile}",
-  "text": "Full passage text here...",
+  "textType": "${textType}",
+  "wordCount": 225,
+  "summary": "Brief summary",
+  "passage": "Full passage text here...",
   "questions": [
     {
       "id": 1,
-      "question": "Question text",
+      "type": "Literal",
+      "question": "Question text?",
       "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0,
-      "explanation": "Brief explanation"
+      "correctAnswer": 0,
+      "explanation": "Teacher explanation"
     }
   ]
 }`;
 
-        try {
-          const res = await fetch(webhookUrl, {
-            method: 'POST',
-            body: JSON.stringify({
-              action: 'generate',
-              prompt: promptText
-            })
+        let generatedData = null;
+
+        if (webhookUrl.trim()) {
+          const response = await sendToAppsScriptProxy({
+            action: 'generate',
+            prompt: promptText
           });
 
-          const data = await res.json();
-          let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          
-          if (jsonText) {
-            jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(jsonText);
-            setPassage(parsed);
-            setStudentAnswers({});
-            setSubmitted(false);
-          } else {
-            throw new Error("Invalid response format from script proxy.");
+          if (response) {
+            try {
+              let jsonString = typeof response === 'string' ? response : (response.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(response));
+              jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+              generatedData = JSON.parse(jsonString);
+            } catch (err) {
+              console.error('JSON parsing failed from webhook response:', err);
+            }
           }
-        } catch (err) {
-          console.error(err);
-          setErrorMsg("Generation error. Loaded fallback demo passage.");
-          setPassage(DEMO_PASSAGE);
-        } finally {
-          setLoading(false);
         }
+
+        // Fallback to demo passages if Webhook is not configured or fails
+        if (!generatedData) {
+          showToast('Webhook unavailable or not set. Loaded fallback passage.', 'error');
+          generatedData = DEMO_PASSAGES[Math.floor(Math.random() * DEMO_PASSAGES.length)];
+        } else {
+          showToast('Passage generated successfully via Proxy Webhook!');
+        }
+
+        delete generatedData.vocabulary;
+        setPassageData(generatedData);
+        setStudentAnswers({});
+        setIsSubmitted(false);
+        setLoading(false);
+        setActiveTab('print');
       };
 
-      const handleStudentSubmit = async () => {
+      // Student Submission Action
+      const handleStudentSubmit = () => {
         if (!studentName.trim()) {
-          alert("Please enter your name before submitting.");
+          showToast('Please enter your full name before submitting.', 'error');
+          return;
+        }
+        if (Object.keys(studentAnswers).length < passageData.questions.length) {
+          showToast('Please answer all questions before submitting.', 'error');
           return;
         }
 
-        let correct = 0;
-        passage.questions.forEach(q => {
-          if (studentAnswers[q.id] === q.correctIndex) correct++;
+        let score = 0;
+        passageData.questions.forEach(q => {
+          if (studentAnswers[q.id] === q.correctAnswer) {
+            score++;
+          }
         });
 
-        const scoreStr = `${correct} / ${passage.questions.length} (${Math.round((correct / passage.questions.length) * 100)}%)`;
-
-        const payload = {
-          action: 'submitResults',
+        const record = {
+          id: 'sub-' + Date.now(),
+          studentName: studentName.trim(),
           timestamp: new Date().toLocaleString(),
-          studentName: studentName,
-          passageTitle: passage.title,
-          lexile: passage.lexile,
-          score: scoreStr,
-          responses: studentAnswers
+          passageTitle: passageData.title,
+          lexile: passageData.lexile,
+          score: score,
+          maxScore: passageData.questions.length,
+          answers: studentAnswers,
+          questions: passageData.questions
         };
 
-        setSubmitted(true);
+        const updated = [record, ...submissions];
+        setSubmissions(updated);
+        localStorage.setItem('readcheck_submissions_log', JSON.stringify(updated));
 
-        if (webhookUrl && !webhookUrl.includes("PASTE_YOUR")) {
-          try {
-            await fetch(webhookUrl, {
-              method: 'POST',
-              body: JSON.stringify(payload)
-            });
-          } catch (err) {
-            console.error("Failed to post submission:", err);
-          }
+        // Background POST to Apps Script Webhook
+        if (webhookUrl.trim()) {
+          sendToAppsScriptProxy({
+            action: 'submitResults',
+            ...record
+          });
+        }
+
+        setSubmittedResult(record);
+        setIsSubmitted(true);
+        showToast('Assessment submitted quietly.');
+      };
+
+      const toggleDok = (type) => {
+        if (dokTypes.includes(type)) {
+          if (dokTypes.length > 1) setDokTypes(dokTypes.filter(t => t !== type));
+        } else {
+          setDokTypes([...dokTypes, type]);
+        }
+      };
+
+      // Reader Theme Helper
+      const getStudentThemeClasses = () => {
+        switch (studentTheme) {
+          case 'sepia':
+            return {
+              bg: 'bg-[#fbf0d9]',
+              card: 'bg-[#f4e7ce] border-[#e2d5b9]',
+              text: 'text-[#433422]',
+              subtext: 'text-[#7a6549]',
+              accent: 'border-[#c9b793]'
+            };
+          case 'dark':
+            return {
+              bg: 'bg-slate-950',
+              card: 'bg-slate-900 border-slate-800',
+              text: 'text-slate-100',
+              subtext: 'text-slate-400',
+              accent: 'border-slate-700'
+            };
+          default:
+            return {
+              bg: 'bg-slate-50',
+              card: 'bg-white border-slate-200',
+              text: 'text-slate-900',
+              subtext: 'text-slate-500',
+              accent: 'border-slate-200'
+            };
+        }
+      };
+
+      const themeCls = getStudentThemeClasses();
+
+      const getStudentFontCls = () => {
+        switch (studentFontSize) {
+          case 'small': return 'text-sm sm:text-base leading-relaxed';
+          case 'large': return 'text-lg sm:text-xl leading-loose';
+          default: return 'text-base sm:text-lg leading-relaxed';
         }
       };
 
       return (
-        <div className="max-w-5xl mx-auto p-4 md:p-6">
-          {/* Top Bar */}
-          <header className="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-wrap justify-between items-center gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">Reading Assessment Check Generator</h1>
-              <p className="text-xs text-slate-500">School-Wide Secure Deployment</p>
+        <div className={`min-h-screen flex flex-col ${activeTab === 'student' ? themeCls.bg : 'bg-slate-50'} text-slate-900`}>
+          {/* TOAST NOTIFICATION */}
+          {toast && (
+            <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-white flex items-center gap-3 ${
+              toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'
+            }`}>
+              <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+              <span className="font-medium text-sm">{toast.msg}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setView('teacher')} 
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition ${view === 'teacher' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                Teacher View
-              </button>
-              <button 
-                onClick={() => setView('student')} 
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition ${view === 'student' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                Student View
-              </button>
-              <button 
-                onClick={() => window.print()} 
-                className="px-3 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900">
-                Print
-              </button>
-              <button 
-                onClick={() => setShowSettings(!showSettings)} 
-                className="p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100">
-                ⚙️
+          )}
+
+          {/* HEADER NAV */}
+          <header className="bg-slate-900 text-white shadow-md no-print sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('config')}>
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-blue-400 flex items-center justify-center font-bold text-lg shadow">
+                  📖
+                </div>
+                <div>
+                  <h1 className="font-bold text-lg leading-tight flex items-center gap-2 font-lexend">
+                    ReadCheck AI
+                    <span className="text-[10px] bg-indigo-500/30 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-400/30">
+                      Independent Evaluation
+                    </span>
+                  </h1>
+                  <p className="text-xs text-slate-400">Reading Assessment Generator</p>
+                </div>
+              </div>
+
+              <nav className="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
+                <button
+                  onClick={() => setActiveTab('config')}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                    activeTab === 'config' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  ⚙️ Generator
+                </button>
+                <button
+                  onClick={() => setActiveTab('print')}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                    activeTab === 'print' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  📄 Printable View
+                </button>
+                <button
+                  onClick={() => setActiveTab('student')}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                    activeTab === 'student' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  💻 Student Mode
+                </button>
+                <button
+                  onClick={() => setActiveTab('library')}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                    activeTab === 'library' ? 'bg-indigo-600 text-white shadow' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  📊 Results ({submissions.length})
+                </button>
+              </nav>
+
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Teacher Settings</span>
               </button>
             </div>
           </header>
 
-          {/* Settings Modal */}
-          {showSettings && (
-            <div className="no-print bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-900">
-              <h3 className="font-bold mb-2">Google Apps Script Webhook Integration</h3>
-              <p className="mb-2 text-xs">Enter your Google Apps Script URL below to power passage generation and Google Sheets score export automatically for all staff:</p>
-              <input 
-                type="text" 
-                value={webhookUrl} 
-                onChange={(e) => setWebhookUrl(e.target.value)} 
-                placeholder="https://script.google.com/macros/s/.../exec"
-                className="w-full p-2 border border-amber-300 rounded bg-white text-xs font-mono mb-2"
-              />
-              <button onClick={() => setShowSettings(false)} className="px-3 py-1 bg-amber-800 text-white rounded text-xs font-bold">
-                Save & Close
-              </button>
-            </div>
-          )}
+          {/* MAIN CONTAINER */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
-          {errorMsg && (
-            <div className="no-print bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-6 text-sm">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* TEACHER VIEW */}
-          {view === 'teacher' && (
-            <div className="space-y-6">
-              <div className="no-print bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Lexile Band</label>
-                  <select value={lexile} onChange={(e) => setLexile(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm">
-                    <option value="400L-500L">400L - 500L (Grades 2-3)</option>
-                    <option value="600L-700L">600L - 700L (Grades 3-4)</option>
-                    <option value="800L-900L">800L - 900L (Grades 4-5)</option>
-                    <option value="1000L-1100L">1000L - 1100L (Grades 6-8)</option>
-                    <option value="1100L+">1100L+ (High School)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Genre</label>
-                  <select value={genre} onChange={(e) => setGenre(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm">
-                    <option value="Informational">Informational Text</option>
-                    <option value="Literary">Literary / Narrative</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Topic</label>
-                  <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm" />
-                </div>
-                <div className="md:col-span-3">
-                  <button 
-                    onClick={generatePassage} 
-                    disabled={loading}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow transition disabled:opacity-50">
-                    {loading ? "Generating Assessment..." : "Generate New Passage & Assessment"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Passage Preview */}
-              <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center border-b pb-4 mb-4">
-                  <h2 className="text-2xl font-bold text-slate-900">{passage.title}</h2>
-                  <span className="px-3 py-1 bg-slate-100 text-slate-600 font-semibold rounded-full text-xs">{passage.lexile}</span>
-                </div>
-                <p className="text-slate-700 leading-relaxed text-base mb-8 whitespace-pre-line">{passage.text}</p>
-
-                <h3 className="font-bold text-lg text-slate-900 mb-4 border-b pb-2">Comprehension Questions</h3>
-                <div className="space-y-6">
-                  {passage.questions.map((q, idx) => (
-                    <div key={q.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                      <p className="font-semibold text-slate-800 mb-2">{idx + 1}. {q.question}</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                        {q.options.map((opt, oIdx) => (
-                          <div key={oIdx} className={`p-2 rounded border ${oIdx === q.correctIndex ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-900' : 'bg-white border-slate-200'}`}>
-                            {String.fromCharCode(65 + oIdx)}. {opt}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STUDENT VIEW */}
-          {view === 'student' && (
-            <div className={`p-6 rounded-xl border transition ${theme === 'sepia' ? 'bg-amber-50 border-amber-200 text-amber-900' : theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
-              <div className="no-print flex flex-wrap justify-between items-center gap-4 border-b pb-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setLineReaderActive(!lineReaderActive)} 
-                    className={`px-3 py-1.5 rounded text-xs font-semibold border ${lineReaderActive ? 'bg-amber-400 text-slate-900 border-amber-500' : 'bg-slate-100 text-slate-600'}`}>
-                    Line Reader: {lineReaderActive ? 'ON' : 'OFF'}
-                  </button>
-                  <select value={fontSize} onChange={(e) => setFontSize(e.target.value)} className="p-1.5 border rounded text-xs text-slate-800">
-                    <option value="text-sm">Small Text</option>
-                    <option value="text-base">Medium Text</option>
-                    <option value="text-lg">Large Text</option>
-                  </select>
-                  <select value={theme} onChange={(e) => setTheme(e.target.value)} className="p-1.5 border rounded text-xs text-slate-800">
-                    <option value="light">Light Theme</option>
-                    <option value="sepia">Sepia Theme</option>
-                    <option value="dark">Dark Theme</option>
-                  </select>
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="Enter Student Name" 
-                  value={studentName} 
-                  onChange={(e) => setStudentName(e.target.value)}
-                  className="p-2 border rounded text-sm text-slate-800"
-                />
-              </div>
-
-              {!submitted ? (
-                <div>
-                  <h2 className="text-2xl font-bold mb-4">{passage.title}</h2>
-                  <div 
-                    ref={passageRef} 
-                    onMouseMove={handleMouseMove}
-                    className={`relative leading-relaxed mb-8 ${fontSize} whitespace-pre-line select-none`}>
-                    {lineReaderActive && (
-                      <div className="line-reader-overlay" style={{ top: `${linePos}px`, height: '28px' }} />
-                    )}
-                    {passage.text}
+            {/* 1. GENERATOR CONFIG VIEW */}
+            {activeTab === 'config' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 font-lexend flex items-center gap-2">
+                      <span>🎯</span> Assessment Configuration
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Set Lexile targets, text genres, topics, and Depth of Knowledge targets.
+                    </p>
                   </div>
 
-                  <h3 className="font-bold text-lg mb-4 border-b pb-2">Questions</h3>
-                  <div className="space-y-6 mb-8">
-                    {passage.questions.map((q, idx) => (
-                      <div key={q.id} className="p-4 rounded-lg border border-slate-200/50 bg-slate-50/5 text-slate-800">
-                        <p className="font-semibold mb-3">{idx + 1}. {q.question}</p>
-                        <div className="space-y-2">
-                          {q.options.map((opt, oIdx) => (
-                            <label key={oIdx} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-100/50 cursor-pointer text-sm">
-                              <input 
-                                type="radio" 
-                                name={`question-${q.id}`} 
-                                checked={studentAnswers[q.id] === oIdx} 
-                                onChange={() => setStudentAnswers({...studentAnswers, [q.id]: oIdx})}
-                              />
-                              <span>{String.fromCharCode(65 + oIdx)}. {opt}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button 
-                    onClick={handleStudentSubmit}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow">
-                    Submit Assessment
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center py-12 space-y-4">
-                  <div className="text-5xl">✅</div>
-                  <h2 className="text-2xl font-bold">Assessment Submitted Successfully</h2>
-                  <p className="text-sm opacity-75">Thank you, {studentName}. Your answers have been logged for your teacher.</p>
-                  <button 
-                    onClick={() => { setSubmitted(false); setStudentAnswers({}); }} 
-                    className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded">
-                    Take Again / Reset
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+                  {/* LEXILE SELECTOR */}
+                  <div className="space-y-2">
