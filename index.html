@@ -13,7 +13,7 @@
   <!-- React & ReactDOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone for JSX compilation -->
+  <!-- Babel Standalone for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
@@ -67,7 +67,10 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    // --- PRE-SET SAMPLE PASSAGES (INSTANT FALLBACK & DEMO) ---
+    // DEFAULT FIXED SCHOOL API KEY
+    const DEFAULT_SCHOOL_API_KEY = "AQ.Ab8RN6IHysys92pnElLX1o8zqAEtxC5vRWaPIQg7v_cQfqzbyQ";
+
+    // --- MOCK SAMPLE PASSAGES (STRICTLY NO VOCABULARY GLOSSARY) ---
     const MOCK_PASSAGES = [
       {
         id: 'sample-1',
@@ -81,11 +84,6 @@
 Inside the hive, bees live in a highly organized colony. Thousands of worker bees divide up responsibilities like building honeycombs, caring for young larvae, and guarding the entrance. But how do bees communicate where to find rich flower patches far away? They use an extraordinary dance!
 
 When a returning scout bee finds a rich source of nectar, it performs a "waggle dance" on the honeycomb. By moving in a figure-eight pattern and shaking its body, the bee tells others the exact direction and distance of the flowers relative to the sun. The faster the bee waggles, the closer the flowers are. Through this remarkable aerial language, bees ensure their colony thrives while keeping our food supply growing.`,
-        vocabulary: [
-          { word: 'Pollination', definition: 'The transfer of pollen to allow plant fertilization and seed growth.' },
-          { word: 'Larvae', definition: 'The young, worm-like early stage of insects after hatching.' },
-          { word: 'Scout', definition: 'A worker sent ahead to search for food or resources.' }
-        ],
         questions: [
           {
             id: 1,
@@ -123,7 +121,7 @@ When a returning scout bee finds a rich source of nectar, it performs a "waggle 
           },
           {
             id: 4,
-            type: 'Vocabulary in Context',
+            type: 'Context Clues',
             question: 'As used in paragraph 3, what does the word "thrives" mean?',
             options: ['Grows healthy and succeeds', 'Struggles to survive', 'Hides from predators', 'Flies away to new homes'],
             correctAnswer: 0,
@@ -149,11 +147,6 @@ Curiosity overpowering her caution, Maya scrambled up the shale embankment. Betw
 With a firm twist, the seal snapped, releasing the dry smell of aged paper. Inside lay a hand-drawn map rendered in faded indigo ink, depicting the canyon as it appeared decades ago, marked with a red star near an abandoned copper mine shaft. 
 
 Maya looked up toward the towering canyon walls. The sun was dipping below the western rim, casting long, purple shadows across the valley floor. They knew they had to head back to camp before dark, but as Maya folded the map into her pocket, she knew their weekend hike had just transformed into an adventure.`,
-        vocabulary: [
-          { word: 'Cairn', definition: 'A mound of stones built as a landmark or memorial.' },
-          { word: 'Crevice', definition: 'A narrow opening or crack in a rock face or wall.' },
-          { word: 'Apprehension', definition: 'Anxiety or fear that something unpleasant might happen.' }
-        ],
         questions: [
           {
             id: 1,
@@ -196,7 +189,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
           },
           {
             id: 4,
-            type: 'Vocabulary in Context',
+            type: 'Context Clues',
             question: 'What does the word "prized" mean in paragraph 3: "Maya gently prized it free"?',
             options: ['Rewarded with a trophy', 'Leveraged or pulled with care', 'Priced for selling', 'Destroyed completely'],
             correctAnswer: 1,
@@ -206,7 +199,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
       }
     ];
 
-    // --- LEXILE BANDS DATA ---
+    // --- LEXILE RANGE DATA ---
     const LEXILE_BANDS = [
       { id: 'BR100L-200L', label: 'BR100L - 200L', grade: 'Grade 1 (Early Reader)' },
       { id: '200L-500L', label: '200L - 500L', grade: 'Grades 2 - 3 (Primary)' },
@@ -216,7 +209,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
       { id: '1200L+', label: '1200L+', grade: 'Grades 11 - 12+ (Advanced / College Prep)' }
     ];
 
-    // --- MAIN APP COMPONENT ---
+    // --- MAIN REACT APPLICATION ---
     function App() {
       // Config State
       const [lexile, setLexile] = useState('500L-800L');
@@ -226,39 +219,44 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
       const [topic, setTopic] = useState('');
       const [numQuestions, setNumQuestions] = useState(4);
       const [targetWords, setTargetWords] = useState(230);
-      const [dokTypes, setDokTypes] = useState(['Literal', 'Inferential', 'Evaluative', 'Vocabulary in Context']);
+      const [dokTypes, setDokTypes] = useState(['Literal', 'Inferential', 'Evaluative', 'Context Clues']);
 
-      // Integration State
-      const [apiKey, setApiKey] = useState(() => localStorage.getItem('readcheck_apikey') || 'AQ.Ab8RN6IHysys92pnElLX1o8zqAEtxC5vRWaPIQg7v_cQfqzbyQ');
-      const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('readcheck_webhook') || '');
+      // Hardcoded Default School API Key & Local Storage Webhook
+      const [apiKey, setApiKey] = useState(() => {
+        return localStorage.getItem('gemini_api_key') || DEFAULT_SCHOOL_API_KEY;
+      });
+      const [webhookUrl, setWebhookUrl] = useState(() => {
+        return localStorage.getItem('readcheck_webhook') || '';
+      });
+
       const [showApiKeyModal, setShowApiKeyModal] = useState(false);
       const [showAppsScriptGuide, setShowAppsScriptGuide] = useState(false);
 
-      // Active View
+      // Active Views & Current Passage
       const [activeTab, setActiveTab] = useState('config'); // 'config' | 'print' | 'student' | 'library'
       const [passageData, setPassageData] = useState(MOCK_PASSAGES[0]);
       const [loading, setLoading] = useState(false);
       const [loadingMessage, setLoadingMessage] = useState('');
       const [toast, setToast] = useState(null);
 
-      // Student Assessment State
+      // Student Assessment State (Strict Independent Compliance)
       const [studentName, setStudentName] = useState('');
       const [studentAnswers, setStudentAnswers] = useState({});
       const [isSubmitted, setIsSubmitted] = useState(false);
       const [submittedResult, setSubmittedResult] = useState(null);
-      const [studentTheme, setStudentTheme] = useState('light'); // 'light' | 'sepia' | 'dark'
-      const [studentFontSize, setStudentFontSize] = useState('text-base'); // 'text-sm' | 'text-base' | 'text-lg' | 'text-xl'
 
-      // Line Reader Accessibility State
+      // Reader Accessibility Controls
       const [lineReaderActive, setLineReaderActive] = useState(false);
       const [lineReaderY, setLineReaderY] = useState(120);
+      const [studentTheme, setStudentTheme] = useState('light'); // 'light' | 'sepia' | 'dark'
+      const [studentFontSize, setStudentFontSize] = useState('medium'); // 'small' | 'medium' | 'large'
       const passageBoxRef = useRef(null);
 
-      // Print View State
+      // Printable Worksheet Controls
       const [printShowKey, setPrintShowKey] = useState(false);
-      const [fontSize, setFontSize] = useState('medium'); // 'small' | 'medium' | 'large'
+      const [printFontSize, setPrintFontSize] = useState('medium');
 
-      // History Library & Submissions
+      // LocalStorage Persistence
       const [history, setHistory] = useState(() => {
         const saved = localStorage.getItem('readcheck_history');
         return saved ? JSON.parse(saved) : MOCK_PASSAGES;
@@ -270,17 +268,18 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
 
       // Save settings to LocalStorage
       useEffect(() => {
-        localStorage.setItem('readcheck_webhook', webhookUrl);
-        localStorage.setItem('readcheck_apikey', apiKey);
-      }, [webhookUrl, apiKey]);
+        localStorage.setItem('gemini_api_key', apiKey);
+      }, [apiKey]);
 
-      // Show Toast Notification
+      useEffect(() => {
+        localStorage.setItem('readcheck_webhook', webhookUrl);
+      }, [webhookUrl]);
+
       const showToast = (msg, type = 'success') => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3500);
       };
 
-      // Save Passage to History
       const saveToHistory = (newPassage) => {
         setHistory(prev => {
           const updated = [newPassage, ...prev.filter(p => p.id !== newPassage.id)];
@@ -289,7 +288,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         });
       };
 
-      // Line Reader Cursor Tracking
+      // Mouse Move Handler for Cursor Line Reader
       const handlePassageMouseMove = (e) => {
         if (!lineReaderActive || !passageBoxRef.current) return;
         const rect = passageBoxRef.current.getBoundingClientRect();
@@ -297,7 +296,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         setLineReaderY(Math.max(20, Math.min(yPos, rect.height - 20)));
       };
 
-      // Export Results to Google Sheets CSV
+      // Export Student Results to Google Sheets CSV
       const exportSubmissionsToCSV = (subsToExport = submissions) => {
         if (!subsToExport || subsToExport.length === 0) {
           showToast('No student submissions found to export.', 'error');
@@ -355,7 +354,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         showToast('Downloaded Google Sheets CSV Export!');
       };
 
-      // Send Payload to Webhook
+      // Background POST Webhook Delivery
       const sendWebhookPayload = async (submissionPayload) => {
         if (!webhookUrl.trim()) return;
         try {
@@ -365,13 +364,13 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
             body: JSON.stringify(submissionPayload),
             mode: 'no-cors'
           });
-          console.log('Webhook payload sent');
+          console.log('Webhook payload dispatched to Google Sheets');
         } catch (err) {
           console.warn('Webhook delivery error:', err);
         }
       };
 
-      // Submit Student Assessment
+      // Student Assessment Submission
       const handleStudentSubmit = () => {
         if (!studentName.trim()) {
           showToast('Please enter the Student Name before submitting.', 'error');
@@ -382,7 +381,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
           return;
         }
 
-        // Score calculation behind the scenes
+        // Quiet Score Evaluation behind the scenes
         let score = 0;
         passageData.questions.forEach(q => {
           if (studentAnswers[q.id] === q.correctAnswer) {
@@ -416,7 +415,6 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         showToast('Assessment submitted quietly.');
       };
 
-      // DOK Checkbox Toggle
       const toggleDok = (type) => {
         if (dokTypes.includes(type)) {
           if (dokTypes.length > 1) {
@@ -427,7 +425,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         }
       };
 
-      // GEMINI API GENERATION FUNCTION
+      // GEMINI API GENERATION METHOD (STRICT NO-GLOSSARY SCHEMA)
       const handleGenerate = async () => {
         const selectedLexileStr = useCustomLexile ? customLexile : lexile;
         
@@ -435,9 +433,9 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         setLoadingMessage('Designing aligned passage and crafting comprehension questions with Gemini AI...');
 
         try {
-          const currentApiKey = apiKey || '';
+          const currentApiKey = apiKey || DEFAULT_SCHOOL_API_KEY;
           
-          const prompt = `Generate a reading comprehension check passage and question set wihtout any vocabulary list or glossary based on the following specifications:
+          const prompt = `Generate a reading comprehension check passage and question set based on the following specifications:
 - Lexile Reading Level Range: ${selectedLexileStr}
 - Text Genre/Type: ${textType}
 - Subject/Topic: ${topic ? topic : 'Engaging age-appropriate topic suitable for the reading level'}
@@ -445,8 +443,10 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
 - Number of Multiple Choice Questions: ${numQuestions}
 - Question Depth of Knowledge / Types to Include: ${dokTypes.join(', ')}
 
+IMPORTANT: DO NOT include any vocabulary definitions list, glossary, or vocabulary key. Only output the passage title, text, summary, and multiple-choice questions.
+
 Ensure the text uses vocabulary and sentence structure strictly aligned to the ${selectedLexileStr} level. 
-Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correct answer index (0 for A, 1 for B, 2 for C, 3 for D), and a clear pedagogical explanation for teachers.`;
+Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correct answer index (0 for A, 1 for B, 2 for C, 3 for D), and a clear pedagogical explanation for the teacher answer key.`;
 
           const jsonSchema = {
             type: "OBJECT",
@@ -483,7 +483,7 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
             contents: [{ parts: [{ text: prompt }] }],
             systemInstruction: {
               parts: [{
-                text: "You are an expert K-12 reading specialist and educational assessment author. You write compelling passages calibrated to requested Lexile levels, accompanied by standards-aligned comprehension questions."
+                text: "You are an expert K-12 reading specialist and educational assessment author. You write compelling passages precisely calibrated to requested Lexile levels, accompanied by rigorous, standards-aligned comprehension questions. Do NOT generate any vocabulary glossaries or word definition lists."
               }]
             },
             generationConfig: {
@@ -519,11 +519,14 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
 
           const result = await response.json();
           const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!jsonText) throw new Error("Did not receive a valid response from Gemini API.");
+          if (!jsonText) throw new Error("Did not receive a valid text response from Gemini API.");
 
           const parsedData = JSON.parse(jsonText);
           parsedData.id = 'gen-' + Date.now();
           if (!parsedData.lexile) parsedData.lexile = selectedLexileStr;
+
+          // Strip any accidental vocabulary field if returned
+          delete parsedData.vocabulary;
 
           setPassageData(parsedData);
           saveToHistory(parsedData);
@@ -539,17 +542,58 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
         }
       };
 
-      // Load Sample Preset
       const loadSample = (sample) => {
-        setPassageData(sample);
+        const cleanSample = { ...sample };
+        delete cleanSample.vocabulary;
+        setPassageData(cleanSample);
         setStudentAnswers({});
         setIsSubmitted(false);
-        showToast(`Loaded sample: "${sample.title}"`);
+        showToast(`Loaded preset: "${cleanSample.title}"`);
         setActiveTab('print');
       };
 
+      // Theme Classes for Student View
+      const getStudentThemeClasses = () => {
+        switch (studentTheme) {
+          case 'sepia':
+            return {
+              bg: 'bg-[#fbf0d9]',
+              card: 'bg-[#f4e7ce] border-[#e2d5b9]',
+              text: 'text-[#433422]',
+              subtext: 'text-[#7a6549]',
+              accent: 'border-[#c9b793]'
+            };
+          case 'dark':
+            return {
+              bg: 'bg-slate-950',
+              card: 'bg-slate-900 border-slate-800',
+              text: 'text-slate-100',
+              subtext: 'text-slate-400',
+              accent: 'border-slate-700'
+            };
+          default:
+            return {
+              bg: 'bg-slate-50',
+              card: 'bg-white border-slate-200',
+              text: 'text-slate-900',
+              subtext: 'text-slate-500',
+              accent: 'border-slate-200'
+            };
+        }
+      };
+
+      const themeCls = getStudentThemeClasses();
+
+      const getStudentFontCls = () => {
+        switch (studentFontSize) {
+          case 'small': return 'text-sm sm:text-base leading-relaxed';
+          case 'large': return 'text-lg sm:text-xl leading-loose';
+          default: return 'text-base sm:text-lg leading-relaxed';
+        }
+      };
+
       return (
-        <div className="min-h-screen flex flex-col">
+        <div className={`min-h-screen flex flex-col ${activeTab === 'student' ? themeCls.bg : 'bg-slate-50'} text-slate-900`}>
           {/* TOAST NOTIFICATION */}
           {toast && (
             <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-2xl text-white flex items-center gap-3 transition-all ${
@@ -570,15 +614,15 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
                 <div>
                   <h1 className="font-bold text-lg leading-tight flex items-center gap-2 font-lexend">
                     ReadCheck AI
-                    <span className="text-xs bg-indigo-500/30 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-400/30">
-                      Assessment Generator
+                    <span className="text-[10px] bg-indigo-500/30 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-400/30">
+                      Independent Evaluation
                     </span>
                   </h1>
-                  <p className="text-xs text-slate-400">Lexile-Aligned Reading & Independent Evaluation Tool</p>
+                  <p className="text-xs text-slate-400">Reading Comprehension Check Generator</p>
                 </div>
               </div>
 
-              {/* NAVIGATION TABS */}
+              {/* NAV TABS */}
               <nav className="flex items-center space-x-1 sm:space-x-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
                 <button
                   onClick={() => setActiveTab('config')}
@@ -602,7 +646,7 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
                     activeTab === 'student' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                   }`}
                 >
-                  <span>💻</span> Student Mode
+                  <span>💻</span> Student Assessment Mode
                 </button>
                 <button
                   onClick={() => setActiveTab('library')}
@@ -614,886 +658,116 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
                 </button>
               </nav>
 
-              {/* API KEY & SETTINGS BUTTON */}
+              {/* SETTINGS BUTTON */}
               <button
                 onClick={() => setShowApiKeyModal(true)}
                 className="hidden sm:flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition"
               >
-                <span className={`w-2 h-2 rounded-full ${apiKey ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>Teacher Settings</span>
               </button>
             </div>
           </header>
 
-          {/* MAIN CONTENT CONTAINER */}
+          {/* MAIN CONTAINER */}
           <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
-            {/* 1. TEACHER CONFIGURATOR TAB */}
+            {/* 1. TEACHER CONFIGURATION & GENERATOR PANEL */}
             {activeTab === 'config' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* LEFT: CONFIG FORM */}
-                <div className="lg:col-span-7 space-y-6">
-                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200">
-                    <h2 className="text-xl font-extrabold text-slate-900 font-lexend mb-1 flex items-center gap-2">
-                      <span>✨</span> Generate Reading Assessment
+                {/* CONFIGURATION FORM */}
+                <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 space-y-6">
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 font-lexend flex items-center gap-2">
+                      <span>🎯</span> Assessment Parameters
                     </h2>
-                    <p className="text-xs text-slate-500 mb-6">
-                      Customize target Lexile reading level, genre, passage topic, and question depth.
+                    <p className="text-xs text-slate-500 mt-1">
+                      Configure Lexile targets, text parameters, and Depth of Knowledge question types.
                     </p>
+                  </div>
 
-                    <div className="space-y-5">
-                      {/* LEXILE LEVEL SELECTOR */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                            Target Lexile Level:
-                          </label>
-                          <label className="inline-flex items-center cursor-pointer text-xs text-indigo-600 font-medium">
-                            <input
-                              type="checkbox"
-                              checked={useCustomLexile}
-                              onChange={(e) => setUseCustomLexile(e.target.checked)}
-                              className="mr-1.5 rounded text-indigo-600"
-                            />
-                            Custom Lexile Code
-                          </label>
-                        </div>
-
-                        {!useCustomLexile ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                            {LEXILE_BANDS.map(band => (
-                              <button
-                                key={band.id}
-                                type="button"
-                                onClick={() => setLexile(band.id)}
-                                className={`p-3 rounded-xl border text-left transition ${
-                                  lexile === band.id
-                                    ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-200'
-                                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                                }`}
-                              >
-                                <div className="font-bold text-xs text-slate-900">{band.label}</div>
-                                <div className="text-[10px] text-slate-500 mt-0.5">{band.grade}</div>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            value={customLexile}
-                            onChange={(e) => setCustomLexile(e.target.value)}
-                            placeholder="e.g. 740L or BR200L"
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
-                          />
-                        )}
-                      </div>
-
-                      {/* TEXT TYPE / GENRE */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                            Text Genre:
-                          </label>
-                          <select
-                            value={textType}
-                            onChange={(e) => setTextType(e.target.value)}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                          >
-                            <option value="Informational">Informational (Non-Fiction)</option>
-                            <option value="Literary">Literary (Fiction / Narrative)</option>
-                            <option value="Scientific">Scientific Explanation</option>
-                            <option value="Historical">Historical Account</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                            Question Count:
-                          </label>
-                          <select
-                            value={numQuestions}
-                            onChange={(e) => setNumQuestions(Number(e.target.value))}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                          >
-                            <option value={3}>3 Questions</option>
-                            <option value={4}>4 Questions (Standard)</option>
-                            <option value={5}>5 Questions</option>
-                            <option value={6}>6 Questions</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* TOPIC / THEME INPUT */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                          Passage Topic / Subject (Optional):
-                        </label>
-                        <input
-                          type="text"
-                          value={topic}
-                          onChange={(e) => setTopic(e.target.value)}
-                          placeholder="e.g., Deep Sea Coral Reefs, Mars Rover, Ancient Egypt, Friendship..."
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                        />
-                      </div>
-
-                      {/* TARGET WORD COUNT SLIDER */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                            Target Passage Length:
-                          </label>
-                          <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                            ~{targetWords} words
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={150}
-                          max={350}
-                          step={10}
-                          value={targetWords}
-                          onChange={(e) => setTargetWords(Number(e.target.value))}
-                          className="w-full accent-indigo-600 cursor-pointer"
-                        />
-                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                          <span>Short (150w)</span>
-                          <span>Standard (230w)</span>
-                          <span>Long (350w)</span>
-                        </div>
-                      </div>
-
-                      {/* QUESTION TYPES / DOK CHECKBOXES */}
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
-                          Comprehension Check Focus (DOK Levels):
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {['Literal', 'Inferential', 'Evaluative', 'Vocabulary in Context'].map(type => (
-                            <label
-                              key={type}
-                              className={`p-2.5 rounded-xl border flex items-center space-x-2 text-xs cursor-pointer transition ${
-                                dokTypes.includes(type)
-                                  ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-semibold'
-                                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={dokTypes.includes(type)}
-                                onChange={() => toggleDok(type)}
-                                className="rounded text-indigo-600"
-                              />
-                              <span>{type}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* GENERATE BUTTON */}
+                  {/* LEXILE LEVEL SELECTOR */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        1. Lexile Target Range
+                      </label>
                       <button
-                        onClick={handleGenerate}
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-extrabold py-3.5 px-6 rounded-xl shadow-lg shadow-indigo-200 transition transform active:scale-[0.99] flex items-center justify-center space-x-2 disabled:opacity-50"
+                        onClick={() => setUseCustomLexile(!useCustomLexile)}
+                        className="text-xs text-indigo-600 hover:underline font-medium"
                       >
-                        {loading ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>Generating Passage...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>🧠</span>
-                            <span>Generate Assessment with Gemini AI</span>
-                          </>
-                        )}
+                        {useCustomLexile ? 'Choose Band' : 'Custom Lexile Target'}
                       </button>
                     </div>
-                  </div>
-                </div>
 
-                {/* RIGHT: PRESETS & CURRENT PASSAGE PREVIEW */}
-                <div className="lg:col-span-5 space-y-6">
-                  {/* PRESET SAMPLES BOX */}
-                  <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-200">
-                    <h3 className="font-bold text-sm text-slate-900 mb-2 font-lexend flex items-center gap-1.5">
-                      <span>⚡</span> Instant Sample Passages (No API Key Required)
-                    </h3>
-                    <p className="text-xs text-slate-500 mb-3">
-                      Try pre-loaded standards-aligned assessments instantly:
-                    </p>
-                    <div className="space-y-2">
-                      {MOCK_PASSAGES.map(sample => (
-                        <div
-                          key={sample.id}
-                          onClick={() => loadSample(sample)}
-                          className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 cursor-pointer transition group"
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-bold text-xs text-slate-900 group-hover:text-indigo-600">
-                              {sample.title}
-                            </h4>
-                            <span className="text-[10px] bg-slate-100 font-mono text-slate-600 px-2 py-0.5 rounded font-medium">
-                              {sample.lexile}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
-                            {sample.summary}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                    {!useCustomLexile ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {LEXILE_BANDS.map(band => (
+                          <button
+                            key={band.id}
+                            type="button"
+                            onClick={() => setLexile(band.id)}
+                            className={`p-3 rounded-xl border text-left transition ${
+                              lexile === band.id
+                                ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20'
+                                : 'border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="font-bold text-xs text-slate-900">{band.label}</div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">{band.grade}</div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={customLexile}
+                        onChange={(e) => setCustomLexile(e.target.value)}
+                        placeholder="e.g. 750L or 900L-1000L"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    )}
                   </div>
 
-                  {/* ACTIVE PASSAGE OVERVIEW CARD */}
-                  {passageData && (
-                    <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 rounded-2xl shadow-xl space-y-4">
-                      <div className="flex justify-between items-start border-b border-slate-800 pb-3">
-                        <div>
-                          <span className="text-[10px] font-mono text-indigo-300 uppercase tracking-widest font-bold">
-                            Active Passage
-                          </span>
-                          <h3 className="font-extrabold text-lg font-lexend mt-0.5">
-                            {passageData.title}
-                          </h3>
-                        </div>
-                        <span className="bg-indigo-500/30 text-indigo-200 font-mono text-xs px-2.5 py-1 rounded-full border border-indigo-400/30">
-                          {passageData.lexile}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
-                          <span className="text-slate-400 block text-[10px]">Genre:</span>
-                          <span className="font-bold text-slate-200">{passageData.textType}</span>
-                        </div>
-                        <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/50">
-                          <span className="text-slate-400 block text-[10px]">Word Count:</span>
-                          <span className="font-bold text-slate-200">{passageData.wordCount} words</span>
-                        </div>
-                      </div>
-
-                      <div className="flex space-x-2 pt-2">
-                        <button
-                          onClick={() => setActiveTab('print')}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5"
-                        >
-                          <span>📄</span> Print View
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('student')}
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-1.5"
-                        >
-                          <span>💻</span> Student Mode
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 2. PRINTABLE WORKSHEET TAB */}
-            {activeTab === 'print' && passageData && (
-              <div className="space-y-6">
-                {/* TOOLBAR */}
-                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-200 flex flex-wrap justify-between items-center gap-4 no-print">
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => window.print()}
-                      className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2"
-                    >
-                      <span>🖨️</span> Print / Save PDF
-                    </button>
-
-                    <button
-                      onClick={() => setPrintShowKey(!printShowKey)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-2 ${
-                        printShowKey ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-slate-100 text-slate-700 border-slate-300'
-                      }`}
-                    >
-                      <span>🔑</span> {printShowKey ? 'Hide Teacher Answer Key' : 'Include Teacher Answer Key'}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center space-x-2 text-xs">
-                    <span className="text-slate-500 font-medium">Font Size:</span>
-                    {['small', 'medium', 'large'].map(size => (
-                      <button
-                        key={size}
-                        onClick={() => setFontSize(size)}
-                        className={`px-2.5 py-1 rounded-lg border capitalize ${
-                          fontSize === size ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-slate-100 border-slate-300 text-slate-700'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* PRINTABLE ASSESSMENT CONTAINER */}
-                <div className="bg-white p-8 sm:p-12 rounded-2xl shadow-xl border border-slate-200 print-container max-w-4xl mx-auto space-y-8">
-                  {/* HEADER */}
-                  <div className="border-b-2 border-slate-900 pb-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight font-lexend">
-                          Reading Comprehension Check
-                        </h1>
-                        <p className="text-xs text-slate-600">
-                          Text Type: <b>{passageData.textType}</b> | Lexile: <b>{passageData.lexile}</b>
-                        </p>
-                      </div>
-
-                      {/* SCORE BOX */}
-                      <div className="border-2 border-slate-900 p-2 text-center min-w-[100px] rounded-lg">
-                        <span className="text-[10px] uppercase font-bold text-slate-600 block">SCORE</span>
-                        <div className="text-lg font-mono font-bold mt-1">_____ / {passageData.questions.length}</div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6 text-sm pt-2">
-                      <div className="border-b border-slate-400 pb-1">
-                        <span className="font-bold text-xs text-slate-700">STUDENT NAME:</span>
-                      </div>
-                      <div className="border-b border-slate-400 pb-1">
-                        <span className="font-bold text-xs text-slate-700">DATE:</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PASSAGE TITLE & BODY */}
-                  <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-slate-900 text-center font-lexend">
-                      {passageData.title}
-                    </h2>
-
-                    <div className={`serif-passage text-slate-900 leading-relaxed space-y-4 ${
-                      fontSize === 'small' ? 'text-sm' : fontSize === 'large' ? 'text-lg' : 'text-base'
-                    }`}>
-                      {passageData.passage.split('\n\n').map((paragraph, idx) => (
-                        <p key={idx} className="indent-6">
-                          {paragraph}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* COMPREHENSION QUESTIONS */}
-                  <div className="space-y-6 pt-4 border-t border-slate-300">
-                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-800">
-                      Comprehension Questions
-                    </h3>
-
-                    <div className="space-y-6">
-                      {passageData.questions.map((q, idx) => (
-                        <div key={q.id} className="space-y-2.5">
-                          <div className="flex items-start space-x-2">
-                            <span className="font-bold text-slate-900 text-sm">{idx + 1}.</span>
-                            <span className="font-semibold text-slate-900 text-sm">{q.question}</span>
-                          </div>
-
-                          {/* BUBBLE OPTIONS */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
-                            {q.options.map((option, optIdx) => (
-                              <div key={optIdx} className="flex items-center space-x-2 text-xs text-slate-800">
-                                <span className="w-5 h-5 rounded-full border border-slate-900 flex items-center justify-center font-bold text-[10px] bubble-option shrink-0">
-                                  {String.fromCharCode(65 + optIdx)}
-                                </span>
-                                <span>{option}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* TEACHER ANSWER KEY PAGE (TOGGLE / PRINTABLE) */}
-                  {printShowKey && (
-                    <div className="page-break pt-8 border-t-2 border-dashed border-slate-400 space-y-4">
-                      <div className="bg-amber-50 p-4 rounded-xl border border-amber-300 text-amber-900">
-                        <h3 className="font-extrabold text-base font-lexend flex items-center gap-2">
-                          <span>🔑</span> Teacher Answer Key & Pedagogical Explanations
-                        </h3>
-                        <p className="text-xs text-amber-800">For educator grading reference only.</p>
-                      </div>
-
-                      <div className="space-y-4">
-                        {passageData.questions.map((q, idx) => (
-                          <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-1">
-                            <div className="flex justify-between font-bold text-slate-900">
-                              <span>Question {idx + 1} ({q.type})</span>
-                              <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                                Correct Answer: {String.fromCharCode(65 + q.correctAnswer)}
-                              </span>
-                            </div>
-                            <p className="font-medium text-slate-800">{q.question}</p>
-                            <p className="text-slate-600 italic pt-1 border-t border-slate-200 mt-1">
-                              <b>Explanation:</b> {q.explanation}
-                            </p>
-                          </div>
+                  {/* GENRE AND SUBJECT TOPIC */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                        2. Text Genre
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Informational', 'Literary'].map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setTextType(type)}
+                            className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                              textType === type
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {type}
+                          </button>
                         ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* 3. STUDENT ASSESSMENT MODE (INDEPENDENT READING) */}
-            {activeTab === 'student' && passageData && (
-              <div className="space-y-6">
-                {!isSubmitted ? (
-                  <>
-                    {/* STUDENT TOOLBAR */}
-                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-md border border-slate-200 flex flex-wrap justify-between items-center gap-4">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="bg-indigo-100 text-indigo-800 text-xs font-bold font-mono px-2.5 py-0.5 rounded-full">
-                            Independent Evaluation Mode
-                          </span>
-                          <span className="text-xs text-slate-400">No external aids</span>
-                        </div>
-                        <h2 className="font-extrabold text-xl text-slate-900 font-lexend mt-1">
-                          {passageData.title}
-                        </h2>
-                        <div className="flex items-center space-x-3 text-xs text-slate-500 mt-0.5">
-                          <span>Lexile: <b>{passageData.lexile}</b></span>
-                          <span>•</span>
-                          <span>Word Count: <b>{passageData.wordCount} words</b></span>
-                        </div>
-                      </div>
-
-                      {/* CONTROLS */}
-                      <div className="flex flex-wrap items-center gap-3">
-                        <input
-                          type="text"
-                          value={studentName}
-                          onChange={(e) => setStudentName(e.target.value)}
-                          placeholder="Enter Student Full Name *"
-                          className="px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-56 font-medium"
-                        />
-
-                        {/* LINE READER TOOL TOGGLE */}
-                        <button
-                          onClick={() => setLineReaderActive(!lineReaderActive)}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-2 ${
-                            lineReaderActive
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                          }`}
-                        >
-                          <span>🔍</span>
-                          <span>Line Reader: {lineReaderActive ? 'ON' : 'OFF'}</span>
-                        </button>
-
-                        {/* THEME TOGGLE */}
-                        <select
-                          value={studentTheme}
-                          onChange={(e) => setStudentTheme(e.target.value)}
-                          className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white"
-                        >
-                          <option value="light">☀️ Light Theme</option>
-                          <option value="sepia">📜 Sepia Theme</option>
-                          <option value="dark">🌙 Dark Theme</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* TWO COLUMN READER AND QUIZ SPLIT SCREEN */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                      {/* LEFT: TEXT READER WITH LINE READER FOCUS OVERLAY */}
-                      <div
-                        ref={passageBoxRef}
-                        onMouseMove={handlePassageMouseMove}
-                        className={`lg:col-span-7 p-6 sm:p-8 rounded-2xl shadow-lg border relative overflow-hidden flex flex-col justify-between transition-colors ${
-                          studentTheme === 'sepia'
-                            ? 'bg-[#fbf0d9] text-[#5f4b32] border-[#e8d5b7]'
-                            : studentTheme === 'dark'
-                            ? 'bg-slate-900 text-slate-100 border-slate-800'
-                            : 'bg-white text-slate-900 border-slate-200'
-                        }`}
-                      >
-                        {/* LINE READER FOCUS HIGHLIGHTER MASK */}
-                        {lineReaderActive && (
-                          <div
-                            className="pointer-events-none absolute left-0 right-0 z-20 transition-all duration-75 ease-out"
-                            style={{
-                              top: `${lineReaderY - 24}px`,
-                              height: '48px',
-                              boxShadow: '0 -2000px 0 2000px rgba(15, 23, 42, 0.45), 0 2000px 0 2000px rgba(15, 23, 42, 0.45)',
-                              borderTop: '2.5px solid #4f46e5',
-                              borderBottom: '2.5px solid #4f46e5',
-                              backgroundColor: 'rgba(255, 255, 255, 0.15)'
-                            }}
-                          >
-                            <span className="absolute top-1 right-3 text-[10px] font-mono text-indigo-300 font-bold bg-slate-900/80 px-1.5 py-0.5 rounded">
-                              Tracking Line
-                            </span>
-                          </div>
-                        )}
-
-                        <div>
-                          <div className="flex justify-between items-center border-b border-slate-200/40 pb-3 mb-5">
-                            <span className="text-xs font-bold opacity-60 uppercase tracking-wider">
-                              Reading Passage
-                            </span>
-                            {lineReaderActive && (
-                              <span className="text-xs text-indigo-500 font-medium animate-pulse">
-                                Move cursor over text to slide focus line
-                              </span>
-                            )}
-                          </div>
-
-                          {/* PASSAGE TEXT */}
-                          <div className={`serif-passage leading-relaxed space-y-4 ${studentFontSize}`}>
-                            {passageData.passage.split('\n\n').map((p, idx) => (
-                              <p key={idx} className="indent-4">
-                                {p}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* VOCAB GLOSSARY HELPER */}
-                        {passageData.vocabulary && passageData.vocabulary.length > 0 && (
-                          <div className="mt-8 pt-4 border-t border-slate-200/40">
-                            <span className="text-xs font-bold opacity-70 uppercase tracking-wider block mb-2">
-                              Vocabulary Glossary:
-                            </span>
-                            <div className="flex flex-wrap gap-2">
-                              {passageData.vocabulary.map((v, i) => (
-                                <span key={i} className="text-xs bg-black/5 px-2.5 py-1 rounded-lg border border-black/10">
-                                  <b>{v.word}:</b> {v.definition}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* RIGHT: COMPREHENSION QUESTIONS (NO REAL-TIME FEEDBACK) */}
-                      <div className="lg:col-span-5 space-y-4">
-                        {passageData.questions.map((q, idx) => {
-                          const selectedOpt = studentAnswers[q.id];
-
-                          return (
-                            <div
-                              key={q.id}
-                              className={`bg-white p-5 rounded-2xl shadow-md border transition ${
-                                selectedOpt !== undefined ? 'border-indigo-400 ring-1 ring-indigo-200' : 'border-slate-200'
-                              }`}
-                            >
-                              <div className="flex justify-between items-start mb-3">
-                                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full font-mono">
-                                  Question {idx + 1}
-                                </span>
-                              </div>
-
-                              <h4 className="font-semibold text-slate-900 text-sm mb-3">
-                                {q.question}
-                              </h4>
-
-                              {/* UNGRADED RADIO SELECTION */}
-                              <div className="space-y-2">
-                                {q.options.map((opt, optIdx) => {
-                                  const isThisSelected = selectedOpt === optIdx;
-
-                                  return (
-                                    <label
-                                      key={optIdx}
-                                      className={`p-3 rounded-xl border flex items-center space-x-3 cursor-pointer text-xs sm:text-sm transition ${
-                                        isThisSelected
-                                          ? 'bg-indigo-50 border-indigo-500 text-indigo-950 font-semibold'
-                                          : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                                      }`}
-                                    >
-                                      <input
-                                        type="radio"
-                                        name={`q-${q.id}`}
-                                        checked={isThisSelected}
-                                        onChange={() => setStudentAnswers({ ...studentAnswers, [q.id]: optIdx })}
-                                        className="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                                      />
-                                      <span>{String.fromCharCode(65 + optIdx)}. {opt}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* SUBMIT BUTTON */}
-                        <button
-                          onClick={handleStudentSubmit}
-                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-indigo-200 transition transform active:scale-[0.99] flex items-center justify-center space-x-2"
-                        >
-                          <span>🔒</span>
-                          <span>Submit Assessment</span>
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  /* QUIET CONFIRMATION SCREEN */
-                  <div className="max-w-2xl mx-auto bg-white p-8 sm:p-12 rounded-3xl shadow-xl border border-slate-200 text-center space-y-6">
-                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl mx-auto shadow-inner">
-                      ✓
-                    </div>
                     <div>
-                      <h2 className="text-2xl font-extrabold text-slate-900 font-lexend">
-                        Assessment Submitted
-                      </h2>
-                      <p className="text-slate-500 text-sm mt-1">
-                        Your answers have been quietly recorded for your teacher’s evaluation.
-                      </p>
-                    </div>
-
-                    {/* SUBMISSION SUMMARY CARD */}
-                    {submittedResult && (
-                      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-left space-y-3 font-mono text-xs text-slate-700">
-                        <div className="flex justify-between border-b border-slate-200 pb-2">
-                          <span className="text-slate-500">Student Name:</span>
-                          <span className="font-bold text-slate-900">{submittedResult.studentName}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-200 pb-2">
-                          <span className="text-slate-500">Submitted Date & Time:</span>
-                          <span className="font-bold text-slate-900">{submittedResult.timestamp}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-200 pb-2">
-                          <span className="text-slate-500">Passage Title:</span>
-                          <span className="font-bold text-slate-900">{submittedResult.passageTitle}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Lexile Level:</span>
-                          <span className="font-bold text-slate-900">{submittedResult.lexile}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-                      <button
-                        onClick={() => exportSubmissionsToCSV([submittedResult])}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm shadow-md transition flex items-center justify-center gap-2"
-                      >
-                        <span>📊</span> Download Google Sheets CSV
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setIsSubmitted(false);
-                          setSubmittedResult(null);
-                          setStudentAnswers({});
-                          setStudentName('');
-                        }}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold px-5 py-2.5 rounded-xl text-sm transition"
-                      >
-                        Start Another Assessment
-                      </button>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                        3. Custom Topic / Subject
+                      </label>
+                      <input
+                        type="text"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        placeholder="e.g. Mars Rovers, Ancient Egypt, Friendship..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
                     </div>
                   </div>
-                )}
-              </div>
-            )}
 
-            {/* 4. RESULTS & DATA EXPORT LIBRARY */}
-            {activeTab === 'library' && (
-              <div className="space-y-6">
-                <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-200 flex flex-wrap justify-between items-center gap-4">
-                  <div>
-                    <h2 className="text-xl font-extrabold text-slate-900 font-lexend">
-                      📊 Assessment Results & Student Submissions
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      View completed student evaluation data and export to Google Sheets.
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => exportSubmissionsToCSV(submissions)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5"
-                    >
-                      <span>📥</span> Export All Submissions to CSV
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Clear all student submissions from local storage?')) {
-                          setSubmissions([]);
-                          localStorage.removeItem('readcheck_submissions');
-                          showToast('Submissions log cleared.');
-                        }
-                      }}
-                      className="text-xs text-rose-600 hover:underline"
-                    >
-                      Clear Log
-                    </button>
-                  </div>
-                </div>
-
-                {/* SUBMISSIONS TABLE */}
-                <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
-                  {submissions.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 text-slate-700 uppercase font-mono border-b border-slate-200">
-                          <tr>
-                            <th className="p-3.5">Student Name</th>
-                            <th className="p-3.5">Date & Time</th>
-                            <th className="p-3.5">Passage Title</th>
-                            <th className="p-3.5">Lexile</th>
-                            <th className="p-3.5">Score</th>
-                            <th className="p-3.5">Percentage</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {submissions.map((s, idx) => (
-                            <tr key={s.id || idx} className="hover:bg-slate-50">
-                              <td className="p-3.5 font-bold text-slate-900">{s.studentName}</td>
-                              <td className="p-3.5 text-slate-500 font-mono">{s.timestamp}</td>
-                              <td className="p-3.5 font-medium text-slate-800">{s.passageTitle}</td>
-                              <td className="p-3.5 font-mono">{s.lexile}</td>
-                              <td className="p-3.5 font-bold text-indigo-600 font-mono">
-                                {s.score} / {s.maxScore}
-                              </td>
-                              <td className="p-3.5">
-                                <span className={`px-2 py-0.5 rounded font-mono font-bold ${
-                                  (s.score / s.maxScore) >= 0.75 
-                                    ? 'bg-emerald-100 text-emerald-800' 
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {Math.round((s.score / s.maxScore) * 100)}%
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center text-slate-400 text-sm">
-                      No student submissions logged yet. Have students complete assessments in Student Mode!
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </main>
-
-          {/* TEACHER SETTINGS MODAL */}
-          {showApiKeyModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-lg text-slate-900 font-lexend flex items-center gap-2">
-                    <span>⚙️</span> Teacher & Integration Settings
-                  </h3>
-                  <button onClick={() => setShowApiKeyModal(false)} className="text-slate-400 hover:text-slate-600">
-                    ✕
-                  </button>
-                </div>
-
-                {/* GEMINI API KEY */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Gemini API Key:
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="AIzaSy..."
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                </div>
-
-                {/* GOOGLE APPS SCRIPT WEBHOOK URL */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Google Sheets Webhook URL:
-                    </label>
-                    <button
-                      onClick={() => setShowAppsScriptGuide(!showAppsScriptGuide)}
-                      className="text-[11px] text-indigo-600 hover:underline font-medium"
-                    >
-                      {showAppsScriptGuide ? 'Hide Code' : 'View Apps Script Code'}
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                    placeholder="https://script.google.com/macros/s/.../exec"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-1">
-                    POSTs student assessment results to your Google Sheet upon submission.
-                  </span>
-                </div>
-
-                {/* GOOGLE APPS SCRIPT CODE */}
-                {showAppsScriptGuide && (
-                  <div className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto space-y-1">
-                    <p className="text-amber-300 font-bold">// Google Apps Script Code (Code.gs):</p>
-                    <pre className="whitespace-pre">{`function doGet(e) {
-  return ContentService.createTextOutput("Webhook active!");
-}
-
-function doPost(e) {
-  var data = JSON.parse(e.postData.contents);
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  sheet.appendRow([
-    data.studentName,
-    data.timestamp,
-    data.passageTitle,
-    data.lexile,
-    data.score,
-    data.maxScore
-  ]);
-  return ContentService.createTextOutput("OK");
-}`}</pre>
-                  </div>
-                )}
-
-                <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => setShowApiKeyModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowApiKeyModal(false);
-                      showToast('Settings saved.');
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
-                  >
-                    Save Settings
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* FOOTER */}
-          <footer className="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 no-print">
-            <div className="max-w-7xl mx-auto px-4 text-center space-y-1">
-              <p>Reading Comprehension Check Generator — Powered by Gemini 3 Flash & Lexile Framework Standards</p>
-              <p className="text-slate-500 text-[11px]">Designed for Teachers, Students, and Literacy Specialists</p>
-            </div>
-          </footer>
-        </div>
-      );
-    }
-
-    // Render App
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+                  {/* LENGTH & QUESTION COUNTS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-
