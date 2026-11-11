@@ -437,7 +437,7 @@ Maya looked up toward the towering canyon walls. The sun was dipping below the w
         try {
           const currentApiKey = apiKey || '';
           
-          const prompt = `Generate a reading comprehension check passage and question set based on the following specifications:
+          const prompt = `Generate a reading comprehension check passage and question set wihtout any vocabulary list or glossary based on the following specifications:
 - Lexile Reading Level Range: ${selectedLexileStr}
 - Text Genre/Type: ${textType}
 - Subject/Topic: ${topic ? topic : 'Engaging age-appropriate topic suitable for the reading level'}
@@ -457,17 +457,6 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
               wordCount: { type: "INTEGER" },
               summary: { type: "STRING" },
               passage: { type: "STRING" },
-              vocabulary: {
-                type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: {
-                    word: { type: "STRING" },
-                    definition: { type: "STRING" }
-                  },
-                  required: ["word", "definition"]
-                }
-              },
               questions: {
                 type: "ARRAY",
                 items: {
@@ -990,23 +979,6 @@ Each multiple-choice question must have exactly 4 options (A, B, C, D), 1 correc
                       ))}
                     </div>
                   </div>
-
-                  {/* VOCABULARY GLOSSARY */}
-                  {passageData.vocabulary && passageData.vocabulary.length > 0 && (
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-300 space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-                        Key Vocabulary Glossary:
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                        {passageData.vocabulary.map((vocab, i) => (
-                          <div key={i} className="bg-white p-2 rounded border border-slate-200">
-                            <span className="font-bold text-slate-900">{vocab.word}:</span>{' '}
-                            <span className="text-slate-600">{vocab.definition}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* COMPREHENSION QUESTIONS */}
                   <div className="space-y-6 pt-4 border-t border-slate-300">
