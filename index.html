@@ -4,206 +4,403 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reading Comprehension Check Generator</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- React & ReactDOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone for JSX compilation -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-    .font-lexend {
-      font-family: 'Lexend', sans-serif;
-    }
-    .serif-passage {
-      font-family: 'Merriweather', Georgia, serif;
-    }
-
-    /* Print Stylesheet Optimization */
     @media print {
-      .no-print {
-        display: none !important;
-      }
-      .print-only {
-        display: block !important;
-      }
-      body {
-        background-color: white !important;
-        color: black !important;
-        font-size: 11pt !important;
-      }
-      .print-container {
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        box-shadow: none !important;
-        border: none !important;
-      }
-      .page-break {
-        page-break-before: always !important;
-      }
-      .bubble-option {
-        border: 1.5px solid #000 !important;
-      }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white; color: black; font-size: 12pt; }
+      .page-break { page-break-after: always; }
     }
-    @media screen {
-      .print-only {
-        display: none !important;
-      }
+    .line-reader-overlay {
+      position: absolute;
+      left: 0; right: 0;
+      background: rgba(254, 240, 138, 0.35);
+      border-top: 2px solid #ca8a04;
+      border-bottom: 2px solid #ca8a04;
+      pointer-events: none;
+      transition: top 0.05s ease-out;
+      z-index: 20;
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
+<body class="bg-slate-100 min-h-screen text-slate-800">
   <div id="root"></div>
 
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+  <script type="babel">
+    // SET YOUR GOOGLE APPS SCRIPT WEBHOOK URL HERE
+    const DEFAULT_WEBHOOK_URL = "PASTE_YOUR_APPS_SCRIPT_WEBHOOK_URL_HERE";
 
-    // PRE-LOADED DISTRICT GEMINI API KEY
-    const PRELOADED_GEMINI_API_KEY = "AQ.Ab8RN6LYujJ7nhYg13AKmaz1Yw4k7KNvvR8Q0J63-nMfdl5wzg";
+    const DEMO_PASSAGE = {
+      title: "The Mystery of Migration",
+      lexile: "800L-900L",
+      text: "Every autumn, millions of monarch butterflies embark on an extraordinary journey across North America. Spanning thousands of miles, this migration takes them from Canada and the northern United States down to the warm pine forests of central Mexico. What makes this journey truly remarkable is that no single butterfly completes the entire round trip. Instead, it takes four successive generations to fulfill the annual cycle. The butterflies rely on environmental cues such as declining daylight hours and cooling temperatures to signal when it is time to head south. Along their flight path, they depend heavily on flowering plants for nectar to sustain their energy.",
+      questions: [
+        {
+          id: 1,
+          question: "Where do monarch butterflies travel during their autumn migration?",
+          options: ["From Mexico to Canada", "From Canada/US to central Mexico", "Across the Atlantic Ocean", "To South America"],
+          correctIndex: 1,
+          explanation: "The passage states that they travel from Canada and the northern US down to central Mexico."
+        },
+        {
+          id: 2,
+          question: "Why is the migration described as 'remarkable' in the passage?",
+          options: ["They fly faster than birds", "No single butterfly completes the entire round trip", "They do not need food during the trip", "They travel only at night"],
+          correctIndex: 1,
+          explanation: "The text explains that four successive generations complete the cycle."
+        }
+      ]
+    };
 
-    // MOCK SAMPLE PASSAGES (STRICTLY NO VOCABULARY GLOSSARY)
-    const MOCK_PASSAGES = [
-      {
-        id: 'sample-1',
-        title: 'The Hidden Power of Honeybees',
-        lexile: '650L (Grades 4-5)',
-        textType: 'Informational',
-        wordCount: 235,
-        summary: 'An exploration of how honeybees communicate through the waggle dance and their vital role in food pollination.',
-        passage: `When you see a honeybee buzzing from flower to flower, it might look like a simple insect searching for a sweet snack. However, bees are actually carrying out one of nature’s most critical jobs: pollination. As a bee collects nectar, tiny grains of pollen stick to its furry body. When the bee travels to the next blossom, some of that pollen rubs off, allowing plants to produce seeds, fruits, and vegetables.
+    function App() {
+      const [view, setView] = React.useState('teacher');
+      const [webhookUrl, setWebhookUrl] = React.useState(() => localStorage.getItem('app_script_url') || DEFAULT_WEBHOOK_URL);
+      const [showSettings, setShowSettings] = React.useState(false);
+      const [loading, setLoading] = React.useState(false);
+      const [errorMsg, setErrorMsg] = React.useState('');
+      
+      // Generator parameters
+      const [lexile, setLexile] = React.useState('800L-900L');
+      const [genre, setGenre] = React.useState('Informational');
+      const [topic, setTopic] = React.useState('Animal Adaptation');
+      const [questionCount, setQuestionCount] = React.useState(4);
+      const [dokLevel, setDokLevel] = React.useState('Balanced');
+      
+      // Current Passage Data
+      const [passage, setPassage] = React.useState(DEMO_PASSAGE);
+      
+      // Student Mode State
+      const [studentAnswers, setStudentAnswers] = React.useState({});
+      const [studentName, setStudentName] = React.useState('');
+      const [submitted, setSubmitted] = React.useState(false);
+      const [fontSize, setFontSize] = React.useState('text-base');
+      const [theme, setTheme] = React.useState('light');
+      
+      // Line Reader
+      const [lineReaderActive, setLineReaderActive] = React.useState(false);
+      const [linePos, setLinePos] = React.useState(0);
+      const passageRef = React.useRef(null);
 
-Inside the hive, bees live in a highly organized colony. Thousands of worker bees divide up responsibilities like building honeycombs, caring for young larvae, and guarding the entrance. But how do bees communicate where to find rich flower patches far away? They use an extraordinary dance!
+      React.useEffect(() => {
+        localStorage.setItem('app_script_url', webhookUrl);
+      }, [webhookUrl]);
 
-When a returning scout bee finds a rich source of nectar, it performs a "waggle dance" on the honeycomb. By moving in a figure-eight pattern and shaking its body, the bee tells others the exact direction and distance of the flowers relative to the sun. The faster the bee waggles, the closer the flowers are. Through this remarkable aerial language, bees ensure their colony thrives while keeping our food supply growing.`,
-        questions: [
-          {
-            id: 1,
-            type: 'Literal',
-            question: 'What sticks to a bee’s body when it gathers nectar from a blossom?',
-            options: ['Seeds', 'Honey', 'Tiny grains of pollen', 'Flower petals'],
-            correctAnswer: 2,
-            explanation: 'Paragraph 1 explicitly states: "As a bee collects nectar, tiny grains of pollen stick to its furry body."'
-          },
-          {
-            id: 2,
-            type: 'Inferential',
-            question: 'What would most likely happen to our food supply if bee populations dropped significantly?',
-            options: [
-              'Plants would produce much less fruit and vegetables.',
-              'Flowers would begin to bloom twice as fast.',
-              'Insects like ants would take over building beehives.',
-              'Farmers would no longer need to plant seeds.'
-            ],
-            correctAnswer: 0,
-            explanation: 'Since pollination is required for plants to produce fruits and vegetables, fewer bees means fewer plants can reproduce and bear food.'
-          },
-          {
-            id: 3,
-            type: 'Evaluative',
-            question: 'Why did the author include the detail about the "waggle dance"?',
-            options: [
-              'To prove that bees prefer dancing over flying.',
-              'To explain how bees communicate complex information without speaking.',
-              'To show that queen bees control all worker movements.',
-              'To argue that honeybees are dangerous to humans.'
-            ],
-            correctAnswer: 1,
-            explanation: 'The detail illustrates the remarkable communication mechanism bees use to convey direction and distance to their colony.'
-          },
-          {
-            id: 4,
-            type: 'Context Clues',
-            question: 'As used in paragraph 3, what does the word "thrives" mean?',
-            options: ['Grows healthy and succeeds', 'Struggles to survive', 'Hides from predators', 'Flies away to new homes'],
-            correctAnswer: 0,
-            explanation: 'In context, "ensure their colony thrives" means keeping the hive strong, healthy, and successful.'
+      const handleMouseMove = (e) => {
+        if (!lineReaderActive || !passageRef.current) return;
+        const rect = passageRef.current.getBoundingClientRect();
+        const relativeY = e.clientY - rect.top;
+        if (relativeY >= 0 && relativeY <= rect.height) {
+          setLinePos(relativeY - 16);
+        }
+      };
+
+      const generatePassage = async () => {
+        if (!webhookUrl || webhookUrl.includes("PASTE_YOUR")) {
+          setErrorMsg("Please enter your Google Apps Script Webhook URL in Teacher Settings!");
+          setShowSettings(true);
+          return;
+        }
+
+        setLoading(true);
+        setErrorMsg('');
+
+        const promptText = `Generate a ${genre} reading passage at a ${lexile} Lexile level about '${topic}'. Length: ~225 words. Do NOT include any vocabulary glossary or definition list. Provide ${questionCount} multiple-choice comprehension questions with 4 options each (labeled index 0-3), depth of knowledge focus: ${dokLevel}.
+Return ONLY valid JSON matching this structure:
+{
+  "title": "Title",
+  "lexile": "${lexile}",
+  "text": "Full passage text here...",
+  "questions": [
+    {
+      "id": 1,
+      "question": "Question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "explanation": "Brief explanation"
+    }
+  ]
+}`;
+
+        try {
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'generate',
+              prompt: promptText
+            })
+          });
+
+          const data = await res.json();
+          let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          
+          if (jsonText) {
+            jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(jsonText);
+            setPassage(parsed);
+            setStudentAnswers({});
+            setSubmitted(false);
+          } else {
+            throw new Error("Invalid response format from script proxy.");
           }
-        ]
-      },
-      {
-        id: 'sample-2',
-        title: 'The Mystery of Oak Creek Canyon',
-        lexile: '920L (Grades 6-8)',
-        textType: 'Literary',
-        wordCount: 248,
-        summary: 'Maya and Julian discover an unexpected artifact hidden inside an old stone cairn while hiking along Oak Creek.',
-        passage: `The autumn wind whistled through the golden ponderosa pines as Maya adjusted her backpack strap. Behind her, her younger brother Julian lagged behind, kicking loose pebbles along the narrow red-rock trail of Oak Creek Canyon. 
+        } catch (err) {
+          console.error(err);
+          setErrorMsg("Generation error. Loaded fallback demo passage.");
+          setPassage(DEMO_PASSAGE);
+        } finally {
+          setLoading(false);
+        }
+      };
 
-"Maya, look!" Julian called out, pointing toward a shadow beneath a steep sandstone overhang. Tucked into a natural crevice was a crumbling stack of balanced river stones—a trail cairn, but far older than the modern markers left by casual weekend hikers.
+      const handleStudentSubmit = async () => {
+        if (!studentName.trim()) {
+          alert("Please enter your name before submitting.");
+          return;
+        }
 
-Curiosity overpowering her caution, Maya scrambled up the shale embankment. Between two weathered granite stones rested a rusted metal cylinder, no longer than a pencil, sealed tightly with hardened pine pitch. Maya gently prized it free with her pocket knife. 
+        let correct = 0;
+        passage.questions.forEach(q => {
+          if (studentAnswers[q.id] === q.correctIndex) correct++;
+        });
 
-"Should we open it?" Julian whispered, his eyes wide with a mixture of apprehension and wonder.
+        const scoreStr = `${correct} / ${passage.questions.length} (${Math.round((correct / passage.questions.length) * 100)}%)`;
 
-With a firm twist, the seal snapped, releasing the dry smell of aged paper. Inside lay a hand-drawn map rendered in faded indigo ink, depicting the canyon as it appeared decades ago, marked with a red star near an abandoned copper mine shaft. 
+        const payload = {
+          action: 'submitResults',
+          timestamp: new Date().toLocaleString(),
+          studentName: studentName,
+          passageTitle: passage.title,
+          lexile: passage.lexile,
+          score: scoreStr,
+          responses: studentAnswers
+        };
 
-Maya looked up toward the towering canyon walls. The sun was dipping below the western rim, casting long, purple shadows across the valley floor. They knew they had to head back to camp before dark, but as Maya folded the map into her pocket, she knew their weekend hike had just transformed into an adventure.`,
-        questions: [
-          {
-            id: 1,
-            type: 'Literal',
-            question: 'Where did Maya find the rusted metal cylinder?',
-            options: [
-              'Floating in the waters of Oak Creek',
-              'Inside a crevice between stones in a trail cairn',
-              'Buried deep under the pine needles near camp',
-              'At the bottom of an old copper mine shaft'
-            ],
-            correctAnswer: 1,
-            explanation: 'Paragraph 3 states that Maya found the cylinder between two weathered stones in a cairn tucked in a sandstone crevice.'
-          },
-          {
-            id: 2,
-            type: 'Inferential',
-            question: 'Why did Maya decide not to search for the marked copper mine immediately?',
-            options: [
-              'She didn’t believe the map was authentic.',
-              'Julian was too tired and wanted to quit.',
-              'The sun was setting and night was approaching.',
-              'It started raining heavily in the canyon.'
-            ],
-            correctAnswer: 2,
-            explanation: 'The text notes that the sun was dipping below the rim and purple shadows were growing, requiring them to return to camp before dark.'
-          },
-          {
-            id: 3,
-            type: 'Evaluative',
-            question: 'How does the author establish a sense of suspense and discovery in the story?',
-            options: [
-              'By describing a sudden thunderstorm and wild animals',
-              'By contrasting Julian’s hesitation with sensory details of aged paper, sealed metal, and fading light',
-              'By having the characters argue about who gets to keep the backpack',
-              'By revealing the ending in the very first sentence'
-            ],
-            correctAnswer: 1,
-            explanation: 'The author uses sensory details (dry smell, indigo ink, crumbling stones) and cautious dialogue to create a suspenseful mood of discovery.'
-          },
-          {
-            id: 4,
-            type: 'Context Clues',
-            question: 'What does the word "prized" mean in paragraph 3: "Maya gently prized it free"?',
-            options: ['Rewarded with a trophy', 'Leveraged or pulled with care', 'Priced for selling', 'Destroyed completely'],
-            correctAnswer: 1,
-            explanation: 'To prize something free means to pry or carefully leverage it out of a tight spot.'
+        setSubmitted(true);
+
+        if (webhookUrl && !webhookUrl.includes("PASTE_YOUR")) {
+          try {
+            await fetch(webhookUrl, {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            });
+          } catch (err) {
+            console.error("Failed to post submission:", err);
           }
-        ]
-      }
-    ];
+        }
+      };
 
-    // LEXILE RANGES DATA
-    const LEXILE_BANDS = [
-      { id: 'BR100L-200L', label: 'BR100L - 200L', grade: 'Grade 1 (Early Reader)' },
-      { id: '200L-500L', label: '200L - 500L', grade: 'Grades 2 - 3 (Primary)' },
-      { id: '500L-800L', label: '500L - 800L', grade: 'Grades 4 - 5 (Upper Elementary)' },
-      { id: '800L-1000L', label: '800L - 1000L', grade: 'Grades 6 - 8 (Middle School)' },
-      { id: '1000L-1200L', label: '1000L - 1200L', grade: 'Grades 9 - 10 (High School)' },
-      { id: '
+      return (
+        <div className="max-w-5xl mx-auto p-4 md:p-6">
+          {/* Top Bar */}
+          <header className="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Reading Assessment Check Generator</h1>
+              <p className="text-xs text-slate-500">School-Wide Secure Deployment</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setView('teacher')} 
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition ${view === 'teacher' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                Teacher View
+              </button>
+              <button 
+                onClick={() => setView('student')} 
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition ${view === 'student' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                Student View
+              </button>
+              <button 
+                onClick={() => window.print()} 
+                className="px-3 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900">
+                Print
+              </button>
+              <button 
+                onClick={() => setShowSettings(!showSettings)} 
+                className="p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100">
+                ⚙️
+              </button>
+            </div>
+          </header>
+
+          {/* Settings Modal */}
+          {showSettings && (
+            <div className="no-print bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-900">
+              <h3 className="font-bold mb-2">Google Apps Script Webhook Integration</h3>
+              <p className="mb-2 text-xs">Enter your Google Apps Script URL below to power passage generation and Google Sheets score export automatically for all staff:</p>
+              <input 
+                type="text" 
+                value={webhookUrl} 
+                onChange={(e) => setWebhookUrl(e.target.value)} 
+                placeholder="https://script.google.com/macros/s/.../exec"
+                className="w-full p-2 border border-amber-300 rounded bg-white text-xs font-mono mb-2"
+              />
+              <button onClick={() => setShowSettings(false)} className="px-3 py-1 bg-amber-800 text-white rounded text-xs font-bold">
+                Save & Close
+              </button>
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="no-print bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-6 text-sm">
+              {errorMsg}
+            </div>
+          )}
+
+          {/* TEACHER VIEW */}
+          {view === 'teacher' && (
+            <div className="space-y-6">
+              <div className="no-print bg-white p-6 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Lexile Band</label>
+                  <select value={lexile} onChange={(e) => setLexile(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm">
+                    <option value="400L-500L">400L - 500L (Grades 2-3)</option>
+                    <option value="600L-700L">600L - 700L (Grades 3-4)</option>
+                    <option value="800L-900L">800L - 900L (Grades 4-5)</option>
+                    <option value="1000L-1100L">1000L - 1100L (Grades 6-8)</option>
+                    <option value="1100L+">1100L+ (High School)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Genre</label>
+                  <select value={genre} onChange={(e) => setGenre(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm">
+                    <option value="Informational">Informational Text</option>
+                    <option value="Literary">Literary / Narrative</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Topic</label>
+                  <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm" />
+                </div>
+                <div className="md:col-span-3">
+                  <button 
+                    onClick={generatePassage} 
+                    disabled={loading}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow transition disabled:opacity-50">
+                    {loading ? "Generating Assessment..." : "Generate New Passage & Assessment"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Passage Preview */}
+              <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-center border-b pb-4 mb-4">
+                  <h2 className="text-2xl font-bold text-slate-900">{passage.title}</h2>
+                  <span className="px-3 py-1 bg-slate-100 text-slate-600 font-semibold rounded-full text-xs">{passage.lexile}</span>
+                </div>
+                <p className="text-slate-700 leading-relaxed text-base mb-8 whitespace-pre-line">{passage.text}</p>
+
+                <h3 className="font-bold text-lg text-slate-900 mb-4 border-b pb-2">Comprehension Questions</h3>
+                <div className="space-y-6">
+                  {passage.questions.map((q, idx) => (
+                    <div key={q.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="font-semibold text-slate-800 mb-2">{idx + 1}. {q.question}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className={`p-2 rounded border ${oIdx === q.correctIndex ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-900' : 'bg-white border-slate-200'}`}>
+                            {String.fromCharCode(65 + oIdx)}. {opt}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STUDENT VIEW */}
+          {view === 'student' && (
+            <div className={`p-6 rounded-xl border transition ${theme === 'sepia' ? 'bg-amber-50 border-amber-200 text-amber-900' : theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+              <div className="no-print flex flex-wrap justify-between items-center gap-4 border-b pb-4 mb-6">
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setLineReaderActive(!lineReaderActive)} 
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border ${lineReaderActive ? 'bg-amber-400 text-slate-900 border-amber-500' : 'bg-slate-100 text-slate-600'}`}>
+                    Line Reader: {lineReaderActive ? 'ON' : 'OFF'}
+                  </button>
+                  <select value={fontSize} onChange={(e) => setFontSize(e.target.value)} className="p-1.5 border rounded text-xs text-slate-800">
+                    <option value="text-sm">Small Text</option>
+                    <option value="text-base">Medium Text</option>
+                    <option value="text-lg">Large Text</option>
+                  </select>
+                  <select value={theme} onChange={(e) => setTheme(e.target.value)} className="p-1.5 border rounded text-xs text-slate-800">
+                    <option value="light">Light Theme</option>
+                    <option value="sepia">Sepia Theme</option>
+                    <option value="dark">Dark Theme</option>
+                  </select>
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Enter Student Name" 
+                  value={studentName} 
+                  onChange={(e) => setStudentName(e.target.value)}
+                  className="p-2 border rounded text-sm text-slate-800"
+                />
+              </div>
+
+              {!submitted ? (
+                <div>
+                  <h2 className="text-2xl font-bold mb-4">{passage.title}</h2>
+                  <div 
+                    ref={passageRef} 
+                    onMouseMove={handleMouseMove}
+                    className={`relative leading-relaxed mb-8 ${fontSize} whitespace-pre-line select-none`}>
+                    {lineReaderActive && (
+                      <div className="line-reader-overlay" style={{ top: `${linePos}px`, height: '28px' }} />
+                    )}
+                    {passage.text}
+                  </div>
+
+                  <h3 className="font-bold text-lg mb-4 border-b pb-2">Questions</h3>
+                  <div className="space-y-6 mb-8">
+                    {passage.questions.map((q, idx) => (
+                      <div key={q.id} className="p-4 rounded-lg border border-slate-200/50 bg-slate-50/5 text-slate-800">
+                        <p className="font-semibold mb-3">{idx + 1}. {q.question}</p>
+                        <div className="space-y-2">
+                          {q.options.map((opt, oIdx) => (
+                            <label key={oIdx} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-100/50 cursor-pointer text-sm">
+                              <input 
+                                type="radio" 
+                                name={`question-${q.id}`} 
+                                checked={studentAnswers[q.id] === oIdx} 
+                                onChange={() => setStudentAnswers({...studentAnswers, [q.id]: oIdx})}
+                              />
+                              <span>{String.fromCharCode(65 + oIdx)}. {opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button 
+                    onClick={handleStudentSubmit}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow">
+                    Submit Assessment
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-12 space-y-4">
+                  <div className="text-5xl">✅</div>
+                  <h2 className="text-2xl font-bold">Assessment Submitted Successfully</h2>
+                  <p className="text-sm opacity-75">Thank you, {studentName}. Your answers have been logged for your teacher.</p>
+                  <button 
+                    onClick={() => { setSubmitted(false); setStudentAnswers({}); }} 
+                    className="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded">
+                    Take Again / Reset
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
