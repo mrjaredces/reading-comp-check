@@ -691,7 +691,7 @@
 
       document.getElementById('studentQuizSection').style.display = 'none';
       document.getElementById('studentCompletionSection').style.display = 'block';
-      document.getElementById('sSubmitMsg').innerText = `Thank you, ${name}! Your score of ${scoreStr} has been submitted to your teacher.`;
+      document.getElementById('sSubmitMsg').innerText = `Thank you, ${name}! Your score has been submitted to your teacher.`;
     };
 
     window.resetStudentAssessment = function() {
@@ -734,7 +734,7 @@
       btn.disabled = true;
       btn.innerText = 'Generating Assessment (Please wait ~10-20s)...';
 
-      const promptText = `Generate a ${selectedGenre} reading passage at a ${selectedLexile} Lexile level ${topicClause}. Length: ${selectedLength}. Do NOT include any vocabulary glossary or definition list. Provide exactly ${selectedNumQuestions} multiple-choice comprehension questions covering these question types: ${questionTypesStr}. Each question must have exactly 4 options (labeled index 0-3).
+      const promptText = `Generate a ${selectedGenre} reading passage at a ${selectedLexile} Lexile level ${topicClause}. Length: ${selectedLength}. Ensure passages with Literary/Narrative Genre read as short stories or excerpts from novels or fictitious stories. Do NOT include any vocabulary glossary or definition list. Provide exactly ${selectedNumQuestions} multiple-choice comprehension questions covering these question types: ${questionTypesStr}. Each question must have exactly 4 options (labeled index 0-3).
 Return ONLY valid JSON matching this exact structure:
 {
   "title": "Passage Title",
