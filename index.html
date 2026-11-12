@@ -405,7 +405,7 @@
     let studentAnswers = {};
     let lineReaderActive = false;
 
-    // ROBUST JSON EXTRACTOR
+    // ROBUST JSON EXTRACTOR & ERROR FORMATTER
     function parseAIResponse(rawText) {
       if (typeof rawText === 'object' && rawText !== null) return rawText;
       let str = String(rawText);
@@ -421,6 +421,15 @@
         return JSON.parse(jsonSub);
       }
       throw new Error("No valid JSON structure found in webhook output.");
+    }
+
+    function formatErrorMessage(err) {
+      if (!err) return "Unknown system error";
+      if (typeof err === 'string') return err;
+      if (err.message && typeof err.message === 'string') return err.message;
+      if (err.error && typeof err.error === 'string') return err.error;
+      if (err.error && typeof err.error === 'object' && err.error.message) return err.error.message;
+      try { return JSON.stringify(err); } catch(e) { return String(err); }
     }
 
     // DATA NORMALIZATION HELPER
@@ -442,16 +451,16 @@
 
     // DYNAMIC LOCAL FALLBACK GENERATOR
     function generateFallbackPassage(topic, lexile) {
-      const topicTitle = topic ? topic.charAt(0).toUpperCase() + topic.slice(1) : "Scientific Discoveries";
+      const topicTitle = topic ? topic.charAt(0).toUpperCase() + topic.slice(1) : "Scientific Principles";
       return {
         title: `${topicTitle} (${lexile} Reading Practice)`,
         lexile: lexile,
-        text: `Scientists and researchers have long studied ${topicTitle.toLowerCase()} to better understand how complex systems operate in our environment. Observations made over recent years show significant patterns that help predict future changes.\n\nBy carefully analyzing data collected from various testing sites, experts can draw meaningful conclusions. These findings allow educators, students, and community leaders to make informed decisions for the future. Understanding these core principles remains a vital part of modern science and learning.`,
+        text: `Scientists and researchers study ${topicTitle.toLowerCase()} to better understand key operational rules in our environment. Observations collected over recent years highlight significant patterns that help predict future developments.\n\nBy carefully analyzing data collected from various testing sites, experts can draw meaningful conclusions. These findings allow educators, students, and community leaders to make informed decisions. Understanding these core concepts remains a vital step in modern learning.`,
         questions: [
           {
             id: 1,
-            question: `What is the main topic of the passage?`,
-            options: [`The study of ${topicTitle.toLowerCase()}`, "Historical trading routes", "Space travel technologies", "Art history techniques"],
+            question: `What is the main subject of the passage?`,
+            options: [`The study of ${topicTitle.toLowerCase()}`, "Historical trade routes", "Space travel technologies", "Art history techniques"],
             correctIndex: 0,
             explanation: "The passage directly focuses on explaining core concepts of the topic."
           },
@@ -769,12 +778,14 @@ Return ONLY valid JSON matching this exact structure:
         let parsedData;
         try {
           let jsonObj = parseAIResponse(textData);
-          if (jsonObj.error) throw new Error(jsonObj.error);
+          if (jsonObj.error) {
+            throw new Error(formatErrorMessage(jsonObj.error));
+          }
           let rawText = jsonObj.candidates?.[0]?.content?.parts?.[0]?.text || jsonObj.text || jsonObj.result || (typeof jsonObj === 'object' ? jsonObj : textData);
           parsedData = parseAIResponse(rawText);
         } catch (e) {
           console.error("Parsing error:", e, textData);
-          throw new Error(e.message || "Invalid JSON structure returned by server.");
+          throw new Error(formatErrorMessage(e));
         }
 
         currentPassage = sanitizePassage(parsedData);
@@ -783,7 +794,8 @@ Return ONLY valid JSON matching this exact structure:
       })
       .catch(err => {
         console.warn('Webhook generation failed:', err);
-        alertBox.innerText = `Notice: Webhook returned an error (${err.message}). Generated offline template for ${selectedLexile}.`;
+        const detailedMsg = formatErrorMessage(err);
+        alertBox.innerText = `Notice: Webhook returned an error (${detailedMsg}). Generated offline template for ${selectedLexile}.`;
         alertBox.style.display = 'block';
         alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         
