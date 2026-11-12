@@ -36,7 +36,7 @@
     h1 { font-size: 1.25rem; font-weight: 700; color: #0f172a; }
     .subtitle { font-size: 0.75rem; color: #64748b; }
 
-    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
     .btn {
       padding: 0.5rem 1rem;
       border-radius: 8px;
@@ -56,6 +56,35 @@
     .btn-success:hover { background-color: #047857; }
     .btn-active { background-color: #4f46e5; color: #ffffff; }
 
+    /* Button Selector Pills */
+    .selector-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .pill-grid { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .pill-btn {
+      padding: 0.4rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid #cbd5e1;
+      background-color: #ffffff;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pill-btn:hover { background-color: #f1f5f9; border-color: #94a3b8; }
+    .pill-btn.active {
+      background-color: #4f46e5;
+      color: #ffffff;
+      border-color: #4f46e5;
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+    }
+
     .card {
       background-color: #ffffff;
       border: 1px solid #e2e8f0;
@@ -65,15 +94,7 @@
       box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     }
 
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    label { display: block; font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem; }
-    select, input[type="text"] {
+    input[type="text"] {
       width: 100%;
       padding: 0.5rem 0.75rem;
       border: 1px solid #cbd5e1;
@@ -82,7 +103,7 @@
       background-color: #ffffff;
       color: #0f172a;
     }
-    select:focus, input:focus { outline: 2px solid #6366f1; outline-offset: -1px; }
+    input:focus { outline: 2px solid #6366f1; outline-offset: -1px; }
 
     .alert {
       padding: 0.75rem 1rem;
@@ -147,7 +168,7 @@
       font-weight: 600;
     }
 
-    /* Student Themes */
+    /* Student Accommodation Themes */
     .theme-light { background-color: #ffffff; color: #0f172a; }
     .theme-sepia { background-color: #fbf0d9; color: #432818; }
     .theme-dark { background-color: #0f172a; color: #f8fafc; }
@@ -202,95 +223,66 @@
     <!-- Top Header Navigation -->
     <header class="no-print">
       <div>
-        <h1>Reading Comprehension Check</h1>
+        <h1>Reading Assessment Generator</h1>
         <div class="subtitle">Zero-Configuration School Deployment</div>
       </div>
       <div class="btn-group">
-        <button id="btnTeacher" class="btn btn-active" onclick="window.switchView('teacher')">Teacher View</button>
-        <button id="btnStudent" class="btn btn-secondary" onclick="window.switchView('student')">Student View</button>
-        <button class="btn btn-dark" onclick="window.print()">Print Worksheet</button>
+        <button id="btnOnline" class="btn btn-active" onclick="window.switchView('online')">Online View</button>
+        <button id="btnPrint" class="btn btn-secondary" onclick="window.switchView('print')">Print View</button>
+        <button class="btn btn-secondary" onclick="window.exportCSV()">Export CSV</button>
+        <button class="btn btn-dark" onclick="window.print()">Print</button>
       </div>
     </header>
 
     <!-- Global Diagnostic Alert -->
     <div id="alertBox" class="alert alert-error no-print"></div>
 
-    <!-- TEACHER VIEW -->
-    <div id="teacherView">
-      <div class="card no-print">
-        <div class="form-grid">
-          <div>
-            <label for="lexileSelect">Lexile Level Band</label>
-            <select id="lexileSelect">
-              <option value="400L-500L">400L - 500L (Grades 2-3)</option>
-              <option value="600L-700L">600L - 700L (Grades 3-4)</option>
-              <option value="800L-900L" selected>800L - 900L (Grades 4-5)</option>
-              <option value="1000L-1100L">1000L - 1100L (Grades 6-8)</option>
-              <option value="1100L+">1100L+ (High School)</option>
-            </select>
-          </div>
-          <div>
-            <label for="genreSelect">Text Genre</label>
-            <select id="genreSelect">
-              <option value="Informational" selected>Informational Text</option>
-              <option value="Literary">Literary / Narrative</option>
-            </select>
-          </div>
-          <div>
-            <label for="topicInput">Topic / Subject Matter</label>
-            <input type="text" id="topicInput" value="Animal Adaptation and Survival" placeholder="e.g. Ecosystems, Space, History">
-          </div>
-        </div>
-        <button id="btnGenerate" class="btn btn-primary" style="width: 100%; padding: 0.75rem;" onclick="window.generateAssessment()">
-          Generate New Passage & Assessment
-        </button>
+    <!-- Generator Controls (Button-Driven) -->
+    <div class="card no-print">
+      <div class="selector-label">1. Select Lexile Level Band</div>
+      <div class="pill-grid" id="lexilePills">
+        <button class="pill-btn" onclick="window.selectLexile('400L-500L')">400L - 500L (Grades 2-3)</button>
+        <button class="pill-btn" onclick="window.selectLexile('600L-700L')">600L - 700L (Grades 3-4)</button>
+        <button class="pill-btn active" onclick="window.selectLexile('800L-900L')">800L - 900L (Grades 4-5)</button>
+        <button class="pill-btn" onclick="window.selectLexile('1000L-1100L')">1000L - 1100L (Grades 6-8)</button>
+        <button class="pill-btn" onclick="window.selectLexile('1100L+')">1100L+ (High School)</button>
       </div>
 
-      <!-- Teacher Passage & Answer Key Preview -->
-      <div class="card" id="teacherPassageContainer">
-        <div class="print-header print-only">
-          <div><strong>Name:</strong> ___________________________</div>
-          <div><strong>Date:</strong> _______________</div>
-        </div>
-        
-        <div class="passage-header">
-          <h2 class="passage-title" id="tTitle">Loading...</h2>
-          <span class="badge no-print" id="tLexile">---</span>
-        </div>
-        <div class="passage-body" id="tText"></div>
-
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.5rem;">
-          Comprehension Questions
-        </h3>
-        <div class="question-list" id="tQuestions"></div>
-
-        <!-- Printable Teacher Answer Key (Print Only) -->
-        <div class="print-only page-break" style="margin-top: 2rem;">
-          <h2 style="font-size: 16pt; margin-bottom: 1rem; border-bottom: 2px solid #000;">Teacher Answer Key</h2>
-          <div id="tAnswerKey"></div>
-        </div>
+      <div class="selector-label">2. Select Text Genre</div>
+      <div class="pill-grid" id="genrePills">
+        <button class="pill-btn active" onclick="window.selectGenre('Informational')">Informational Text</button>
+        <button class="pill-btn" onclick="window.selectGenre('Literary')">Literary / Narrative</button>
       </div>
+
+      <div style="margin-bottom: 1.25rem;">
+        <div class="selector-label">3. Topic / Subject Matter</div>
+        <input type="text" id="topicInput" value="Animal Adaptation and Survival" placeholder="e.g. Ecosystems, Space, History">
+      </div>
+
+      <button id="btnGenerate" class="btn btn-primary" style="width: 100%; padding: 0.75rem;" onclick="window.generateAssessment()">
+        Generate New Passage & Assessment
+      </button>
     </div>
 
-    <!-- STUDENT VIEW -->
-    <div id="studentView" style="display: none;">
+    <!-- ONLINE VIEW (Interactive Student Assessment) -->
+    <div id="onlineView">
       <div id="studentCard" class="card theme-light">
         <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 1rem; margin-bottom: 1.5rem;">
           <div class="btn-group">
             <button id="btnLineReader" class="btn btn-secondary" onclick="window.toggleLineReader()">Line Reader: OFF</button>
-            <select id="fontSelect" style="width: auto;" onchange="window.setStudentFontSize(this.value)">
-              <option value="font-sm">Small Text</option>
-              <option value="font-md" selected>Medium Text</option>
-              <option value="font-lg">Large Text</option>
-            </select>
-            <select id="themeSelect" style="width: auto;" onchange="window.setStudentTheme(this.value)">
-              <option value="theme-light" selected>Light Theme</option>
-              <option value="theme-sepia">Sepia Theme</option>
-              <option value="theme-dark">Dark Theme</option>
-            </select>
+            <div class="btn-group">
+              <button class="btn btn-secondary" onclick="window.setStudentFontSize('font-sm')">Small</button>
+              <button class="btn btn-secondary" onclick="window.setStudentFontSize('font-md')">Medium</button>
+              <button class="btn btn-secondary" onclick="window.setStudentFontSize('font-lg')">Large</button>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-secondary" onclick="window.setStudentTheme('theme-light')">Light</button>
+              <button class="btn btn-secondary" onclick="window.setStudentTheme('theme-sepia')">Sepia</button>
+              <button class="btn btn-secondary" onclick="window.setStudentTheme('theme-dark')">Dark</button>
+            </div>
           </div>
           <div>
-            <input type="text" id="studentNameInput" placeholder="Enter Your Full Name" style="width: 220px;">
+            <input type="text" id="studentNameInput" placeholder="Enter Student Name" style="width: 200px;">
           </div>
         </div>
 
@@ -317,6 +309,33 @@
           <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Assessment Submitted</h2>
           <p id="sSubmitMsg" style="font-size: 0.95rem; color: #64748b; margin-bottom: 1.5rem;">Thank you! Your responses have been recorded.</p>
           <button class="btn btn-secondary" onclick="window.resetStudentAssessment()">Take Assessment Again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRINT VIEW (Worksheet & Answer Key) -->
+    <div id="printView" style="display: none;">
+      <div class="card" id="teacherPassageContainer">
+        <div class="print-header print-only">
+          <div><strong>Name:</strong> ___________________________</div>
+          <div><strong>Date:</strong> _______________</div>
+        </div>
+        
+        <div class="passage-header">
+          <h2 class="passage-title" id="pTitle">Loading...</h2>
+          <span class="badge no-print" id="pLexile">---</span>
+        </div>
+        <div class="passage-body" id="pText"></div>
+
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0.5rem;">
+          Comprehension Questions
+        </h3>
+        <div class="question-list" id="pQuestions"></div>
+
+        <!-- Printable Teacher Answer Key (Print Only) -->
+        <div class="print-only page-break" style="margin-top: 2rem;">
+          <h2 style="font-size: 16pt; margin-bottom: 1rem; border-bottom: 2px solid #000;">Teacher Answer Key</h2>
+          <div id="pAnswerKey"></div>
         </div>
       </div>
     </div>
@@ -359,7 +378,9 @@
 
     // GLOBAL APP STATE
     let currentPassage = DEMO_PASSAGE;
-    let currentView = 'teacher';
+    let currentView = 'online';
+    let selectedLexile = '800L-900L';
+    let selectedGenre = 'Informational';
     let studentAnswers = {};
     let lineReaderActive = false;
 
@@ -368,7 +389,7 @@
       if (!data) return DEMO_PASSAGE;
       return {
         title: data.title || "Untitled Assessment",
-        lexile: data.lexile || "Custom Band",
+        lexile: data.lexile || selectedLexile,
         text: typeof data.text === 'string' ? data.text : (Array.isArray(data.text) ? data.text.join('\n\n') : DEMO_PASSAGE.text),
         questions: Array.isArray(data.questions) ? data.questions.map((q, idx) => ({
           id: q.id || (idx + 1),
@@ -380,44 +401,33 @@
       };
     }
 
-    // UI RENDER FUNCTIONS
-    function renderTeacherView() {
-      const p = sanitizePassage(currentPassage);
-      document.getElementById('tTitle').innerText = p.title;
-      document.getElementById('tLexile').innerText = p.lexile;
-      document.getElementById('tText').innerText = p.text;
-
-      let qHtml = '';
-      let keyHtml = '';
-
-      p.questions.forEach((q, idx) => {
-        qHtml += `
-          <div class="question-card">
-            <p class="question-text">${idx + 1}. ${q.question}</p>
-            <div class="option-grid">
-              ${q.options.map((opt, oIdx) => `
-                <div class="option-item ${oIdx === q.correctIndex ? 'option-correct' : ''}">
-                  <span>${String.fromCharCode(65 + oIdx)}. ${opt}</span>
-                  ${oIdx === q.correctIndex ? '<span style="margin-left: auto; font-size: 0.75rem;">✓ Correct</span>' : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-
-        keyHtml += `
-          <div style="margin-bottom: 0.75rem; font-size: 11pt;">
-            <strong>Question ${idx + 1}:</strong> Option ${String.fromCharCode(65 + q.correctIndex)}.
-            ${q.explanation ? `<br><em style="color: #475569;">${q.explanation}</em>` : ''}
-          </div>
-        `;
+    // BUTTON SELECTION CONTROLS
+    window.selectLexile = function(val) {
+      selectedLexile = val;
+      const buttons = document.querySelectorAll('#lexilePills .pill-btn');
+      buttons.forEach(btn => {
+        if (btn.innerText.includes(val)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
       });
+    };
 
-      document.getElementById('tQuestions').innerHTML = qHtml;
-      document.getElementById('tAnswerKey').innerHTML = keyHtml;
-    }
+    window.selectGenre = function(val) {
+      selectedGenre = val;
+      const buttons = document.querySelectorAll('#genrePills .pill-btn');
+      buttons.forEach(btn => {
+        if (btn.innerText.includes(val)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    };
 
-    function renderStudentView() {
+    // UI RENDER FUNCTIONS
+    function renderOnlineView() {
       const p = sanitizePassage(currentPassage);
       document.getElementById('sTitle').innerText = p.title;
       document.getElementById('sText').innerText = p.text;
@@ -443,26 +453,61 @@
       document.getElementById('sQuestions').innerHTML = qHtml;
     }
 
+    function renderPrintView() {
+      const p = sanitizePassage(currentPassage);
+      document.getElementById('pTitle').innerText = p.title;
+      document.getElementById('pLexile').innerText = p.lexile;
+      document.getElementById('pText').innerText = p.text;
+
+      let qHtml = '';
+      let keyHtml = '';
+
+      p.questions.forEach((q, idx) => {
+        qHtml += `
+          <div class="question-card">
+            <p class="question-text">${idx + 1}. ${q.question}</p>
+            <div class="option-grid">
+              ${q.options.map((opt, oIdx) => `
+                <div class="option-item">
+                  <span>${String.fromCharCode(65 + oIdx)}. ${opt}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+
+        keyHtml += `
+          <div style="margin-bottom: 0.75rem; font-size: 11pt;">
+            <strong>Question ${idx + 1}:</strong> Option ${String.fromCharCode(65 + q.correctIndex)}.
+            ${q.explanation ? `<br><em style="color: #475569;">${q.explanation}</em>` : ''}
+          </div>
+        `;
+      });
+
+      document.getElementById('pQuestions').innerHTML = qHtml;
+      document.getElementById('pAnswerKey').innerHTML = keyHtml;
+    }
+
     // EXPOSED GLOBAL EVENT HANDLERS
     window.switchView = function(view) {
       currentView = view;
-      const tBtn = document.getElementById('btnTeacher');
-      const sBtn = document.getElementById('btnStudent');
-      const tView = document.getElementById('teacherView');
-      const sView = document.getElementById('studentView');
+      const oBtn = document.getElementById('btnOnline');
+      const pBtn = document.getElementById('btnPrint');
+      const oView = document.getElementById('onlineView');
+      const pView = document.getElementById('printView');
 
-      if (view === 'teacher') {
-        tBtn.className = 'btn btn-active';
-        sBtn.className = 'btn btn-secondary';
-        tView.style.display = 'block';
-        sView.style.display = 'none';
-        renderTeacherView();
+      if (view === 'online') {
+        oBtn.className = 'btn btn-active';
+        pBtn.className = 'btn btn-secondary';
+        oView.style.display = 'block';
+        pView.style.display = 'none';
+        renderOnlineView();
       } else {
-        sBtn.className = 'btn btn-active';
-        tBtn.className = 'btn btn-secondary';
-        sView.style.display = 'block';
-        tView.style.display = 'none';
-        renderStudentView();
+        pBtn.className = 'btn btn-active';
+        oBtn.className = 'btn btn-secondary';
+        pView.style.display = 'block';
+        oView.style.display = 'none';
+        renderPrintView();
       }
     };
 
@@ -508,7 +553,7 @@
     window.submitStudentAssessment = function() {
       const name = document.getElementById('studentNameInput').value.trim();
       if (!name) {
-        alert("Please enter your name before submitting.");
+        alert("Please enter student name before submitting.");
         return;
       }
 
@@ -520,18 +565,28 @@
 
       const scoreStr = `${correctCount} / ${p.questions.length} (${Math.round((correctCount / p.questions.length) * 100)}%)`;
 
+      const submissionRecord = {
+        timestamp: new Date().toLocaleString(),
+        studentName: name,
+        passageTitle: p.title,
+        lexile: p.lexile,
+        score: scoreStr,
+        responses: JSON.stringify(studentAnswers)
+      };
+
+      // Save locally for CSV export
+      let existing = JSON.parse(localStorage.getItem('student_submissions') || '[]');
+      existing.push(submissionRecord);
+      localStorage.setItem('student_submissions', JSON.stringify(existing));
+
+      // Post to Google Webhook
       if (WEBHOOK_URL && !WEBHOOK_URL.includes('PASTE_YOUR')) {
         fetch(WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'submitResults',
-            timestamp: new Date().toLocaleString(),
-            studentName: name,
-            passageTitle: p.title,
-            lexile: p.lexile,
-            score: scoreStr,
-            responses: studentAnswers
+            ...submissionRecord
           })
         }).catch(err => console.error('Submission log error:', err));
       }
@@ -545,7 +600,28 @@
       studentAnswers = {};
       document.getElementById('studentQuizSection').style.display = 'block';
       document.getElementById('studentCompletionSection').style.display = 'none';
-      renderStudentView();
+      renderOnlineView();
+    };
+
+    window.exportCSV = function() {
+      const records = JSON.parse(localStorage.getItem('student_submissions') || '[]');
+      if (records.length === 0) {
+        alert("No student submissions logged yet on this device.");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,Timestamp,Student Name,Passage Title,Lexile,Score\n";
+      records.forEach(r => {
+        csvContent += `"${r.timestamp}","${r.studentName}","${r.passageTitle}","${r.lexile}","${r.score}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `reading_assessment_results_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     };
 
     window.generateAssessment = function() {
@@ -553,18 +629,16 @@
       const btn = document.getElementById('btnGenerate');
       alertBox.style.display = 'none';
 
-      const lexile = document.getElementById('lexileSelect').value;
-      const genre = document.getElementById('genreSelect').value;
       const topic = document.getElementById('topicInput').value || 'General Science';
 
       btn.disabled = true;
       btn.innerText = 'Generating Assessment...';
 
-      const promptText = `Generate a ${genre} reading passage at a ${lexile} Lexile level about '${topic}'. Length: ~225 words. Do NOT include any vocabulary glossary or definition list. Provide 4 multiple-choice comprehension questions with 4 options each (labeled index 0-3).
+      const promptText = `Generate a ${selectedGenre} reading passage at a ${selectedLexile} Lexile level about '${topic}'. Length: ~225 words. Do NOT include any vocabulary glossary or definition list. Provide 4 multiple-choice comprehension questions with 4 options each (labeled index 0-3).
 Return ONLY valid JSON matching this exact structure:
 {
   "title": "Passage Title",
-  "lexile": "${lexile}",
+  "lexile": "${selectedLexile}",
   "text": "Full passage text...",
   "questions": [
     {
@@ -598,14 +672,14 @@ Return ONLY valid JSON matching this exact structure:
           currentPassage = sanitizePassage(data);
         }
         studentAnswers = {};
-        renderTeacherView();
+        if (currentView === 'online') renderOnlineView(); else renderPrintView();
       })
       .catch(err => {
         console.warn('Webhook generation failed or timed out:', err);
         alertBox.innerText = 'Notice: Could not connect to AI Webhook server. Loaded fallback sample passage.';
         alertBox.style.display = 'block';
         currentPassage = DEMO_PASSAGE;
-        renderTeacherView();
+        if (currentView === 'online') renderOnlineView(); else renderPrintView();
       })
       .finally(() => {
         btn.disabled = false;
@@ -615,7 +689,8 @@ Return ONLY valid JSON matching this exact structure:
 
     // INITIALIZATION ON PAGE LOAD
     window.addEventListener('DOMContentLoaded', () => {
-      renderTeacherView();
+      renderOnlineView();
+      renderPrintView();
     });
   </script>
 </body>
