@@ -65,7 +65,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .pill-grid { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .pill-grid { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
     .pill-btn {
       padding: 0.4rem 0.85rem;
       border-radius: 9999px;
@@ -161,12 +161,6 @@
       align-items: center;
       gap: 0.5rem;
     }
-    .option-correct {
-      background-color: #ecfdf5;
-      border-color: #a7f3d0;
-      color: #065f46;
-      font-weight: 600;
-    }
 
     /* Student Accommodation Themes */
     .theme-light { background-color: #ffffff; color: #0f172a; }
@@ -254,8 +248,31 @@
         <button class="pill-btn" onclick="window.selectGenre('Literary')">Literary / Narrative</button>
       </div>
 
+      <div class="selector-label">3. Target Passage Length</div>
+      <div class="pill-grid" id="lengthPills">
+        <button class="pill-btn" onclick="window.selectLength('Short (~150 words)')">Short (~150 words)</button>
+        <button class="pill-btn active" onclick="window.selectLength('Medium (~250 words)')">Medium (~250 words)</button>
+        <button class="pill-btn" onclick="window.selectLength('Long (~350 words)')">Long (~350 words)</button>
+      </div>
+
+      <div class="selector-label">4. Number of Questions</div>
+      <div class="pill-grid" id="numQuestionsPills">
+        <button class="pill-btn" onclick="window.selectNumQuestions(3)">3 Questions</button>
+        <button class="pill-btn active" onclick="window.selectNumQuestions(5)">5 Questions</button>
+        <button class="pill-btn" onclick="window.selectNumQuestions(8)">8 Questions</button>
+        <button class="pill-btn" onclick="window.selectNumQuestions(10)">10 Questions</button>
+      </div>
+
+      <div class="selector-label">5. Question Types (Click to Toggle)</div>
+      <div class="pill-grid" id="questionTypePills">
+        <button class="pill-btn active" onclick="window.toggleQuestionType('Literal', this)">Literal</button>
+        <button class="pill-btn active" onclick="window.toggleQuestionType('Inferential', this)">Inferential</button>
+        <button class="pill-btn active" onclick="window.toggleQuestionType('Evaluative', this)">Evaluative</button>
+        <button class="pill-btn active" onclick="window.toggleQuestionType('Vocabulary in Context', this)">Vocabulary in Context</button>
+      </div>
+
       <div style="margin-bottom: 1.25rem;">
-        <div class="selector-label">3. Topic / Subject Matter</div>
+        <div class="selector-label">6. Topic / Subject Matter</div>
         <input type="text" id="topicInput" value="Animal Adaptation and Survival" placeholder="e.g. Ecosystems, Space, History">
       </div>
 
@@ -381,6 +398,9 @@
     let currentView = 'online';
     let selectedLexile = '800L-900L';
     let selectedGenre = 'Informational';
+    let selectedLength = 'Medium (~250 words)';
+    let selectedNumQuestions = 5;
+    let selectedQuestionTypes = ['Literal', 'Inferential', 'Evaluative', 'Vocabulary in Context'];
     let studentAnswers = {};
     let lineReaderActive = false;
 
@@ -404,26 +424,45 @@
     // BUTTON SELECTION CONTROLS
     window.selectLexile = function(val) {
       selectedLexile = val;
-      const buttons = document.querySelectorAll('#lexilePills .pill-btn');
-      buttons.forEach(btn => {
-        if (btn.innerText.includes(val)) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
+      document.querySelectorAll('#lexilePills .pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(val));
       });
     };
 
     window.selectGenre = function(val) {
       selectedGenre = val;
-      const buttons = document.querySelectorAll('#genrePills .pill-btn');
-      buttons.forEach(btn => {
-        if (btn.innerText.includes(val)) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
+      document.querySelectorAll('#genrePills .pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(val));
       });
+    };
+
+    window.selectLength = function(val) {
+      selectedLength = val;
+      document.querySelectorAll('#lengthPills .pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(val.split(' ')[0]));
+      });
+    };
+
+    window.selectNumQuestions = function(num) {
+      selectedNumQuestions = num;
+      document.querySelectorAll('#numQuestionsPills .pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.startsWith(num.toString()));
+      });
+    };
+
+    window.toggleQuestionType = function(type, btnElement) {
+      const idx = selectedQuestionTypes.indexOf(type);
+      if (idx > -1) {
+        if (selectedQuestionTypes.length === 1) {
+          alert("Please keep at least one question type selected.");
+          return;
+        }
+        selectedQuestionTypes.splice(idx, 1);
+        btnElement.classList.remove('active');
+      } else {
+        selectedQuestionTypes.push(type);
+        btnElement.classList.add('active');
+      }
     };
 
     // UI RENDER FUNCTIONS
@@ -630,11 +669,12 @@
       alertBox.style.display = 'none';
 
       const topic = document.getElementById('topicInput').value || 'General Science';
+      const questionTypesStr = selectedQuestionTypes.join(', ');
 
       btn.disabled = true;
       btn.innerText = 'Generating Assessment...';
 
-      const promptText = `Generate a ${selectedGenre} reading passage at a ${selectedLexile} Lexile level about '${topic}'. Length: ~225 words. Do NOT include any vocabulary glossary or definition list. Provide 4 multiple-choice comprehension questions with 4 options each (labeled index 0-3).
+      const promptText = `Generate a ${selectedGenre} reading passage at a ${selectedLexile} Lexile level about '${topic}'. Length: ${selectedLength}. Do NOT include any vocabulary glossary or definition list. Provide exactly ${selectedNumQuestions} multiple-choice comprehension questions covering these question types: ${questionTypesStr}. Each question must have exactly 4 options (labeled index 0-3).
 Return ONLY valid JSON matching this exact structure:
 {
   "title": "Passage Title",
