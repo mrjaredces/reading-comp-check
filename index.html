@@ -48,6 +48,7 @@
     }
     .btn-primary { background-color: #4f46e5; color: #ffffff; }
     .btn-primary:hover { background-color: #4338ca; }
+    .btn-primary:disabled { background-color: #94a3b8; cursor: not-allowed; }
     .btn-secondary { background-color: #f1f5f9; color: #475569; border-color: #cbd5e1; }
     .btn-secondary:hover { background-color: #e2e8f0; }
     .btn-dark { background-color: #1e293b; color: #ffffff; }
@@ -109,7 +110,7 @@
       padding: 0.75rem 1rem;
       border-radius: 8px;
       font-size: 0.875rem;
-      margin-bottom: 1.5rem;
+      margin-top: 1rem;
       display: none;
     }
     .alert-error { background-color: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
@@ -228,9 +229,6 @@
       </div>
     </header>
 
-    <!-- Global Diagnostic Alert -->
-    <div id="alertBox" class="alert alert-error no-print"></div>
-
     <!-- Generator Controls (Button-Driven) -->
     <div class="card no-print">
       <div class="selector-label">1. Select Lexile Level Band</div>
@@ -273,12 +271,15 @@
 
       <div style="margin-bottom: 1.25rem;">
         <div class="selector-label">6. Topic / Subject Matter (Optional)</div>
-        <input type="text" id="topicInput" placeholder="(Optional) e.g., Ecosystems, Space, History, Invention">
+        <input type="text" id="topicInput" placeholder="(Optional) Leave blank for a random age-appropriate topic, or enter e.g., Ecosystems, Space">
       </div>
 
       <button id="btnGenerate" class="btn btn-primary" style="width: 100%; padding: 0.75rem;" onclick="window.generateAssessment()">
         Generate New Passage & Assessment
       </button>
+
+      <!-- In-Line Diagnostic Alert -->
+      <div id="alertBox" class="alert alert-error"></div>
     </div>
 
     <!-- ONLINE VIEW (Interactive Student Assessment) -->
@@ -363,7 +364,7 @@
     // HARDCODED WEBHOOK URL
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzxDDhxEVpIKogPr-UwALw-yMShLQSW6heDU39MjzXlxgpvwViST9OBdlC5v_REQfnI/exec';
 
-    // FALLBACK DEMO PASSAGE
+    // INITIAL DEMO PASSAGE
     const DEMO_PASSAGE = {
       title: "The Mystery of Monarch Migration",
       lexile: "800L-900L",
@@ -404,6 +405,24 @@
     let studentAnswers = {};
     let lineReaderActive = false;
 
+    // ROBUST JSON EXTRACTOR
+    function parseAIResponse(rawText) {
+      if (typeof rawText === 'object' && rawText !== null) return rawText;
+      let str = String(rawText);
+      try { return JSON.parse(str); } catch(e){}
+      
+      str = str.replace(/```json/gi, '').replace(/```/g, '').trim();
+      try { return JSON.parse(str); } catch(e){}
+      
+      const startIdx = str.indexOf('{');
+      const endIdx = str.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        const jsonSub = str.substring(startIdx, endIdx + 1);
+        return JSON.parse(jsonSub);
+      }
+      throw new Error("No valid JSON structure found in webhook output.");
+    }
+
     // DATA NORMALIZATION HELPER
     function sanitizePassage(data) {
       if (!data) return DEMO_PASSAGE;
@@ -418,6 +437,39 @@
           correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
           explanation: q.explanation || ""
         })) : DEMO_PASSAGE.questions
+      };
+    }
+
+    // DYNAMIC LOCAL FALLBACK GENERATOR
+    function generateFallbackPassage(topic, lexile) {
+      const topicTitle = topic ? topic.charAt(0).toUpperCase() + topic.slice(1) : "Scientific Discoveries";
+      return {
+        title: `${topicTitle} (${lexile} Reading Practice)`,
+        lexile: lexile,
+        text: `Scientists and researchers have long studied ${topicTitle.toLowerCase()} to better understand how complex systems operate in our environment. Observations made over recent years show significant patterns that help predict future changes.\n\nBy carefully analyzing data collected from various testing sites, experts can draw meaningful conclusions. These findings allow educators, students, and community leaders to make informed decisions for the future. Understanding these core principles remains a vital part of modern science and learning.`,
+        questions: [
+          {
+            id: 1,
+            question: `What is the main topic of the passage?`,
+            options: [`The study of ${topicTitle.toLowerCase()}`, "Historical trading routes", "Space travel technologies", "Art history techniques"],
+            correctIndex: 0,
+            explanation: "The passage directly focuses on explaining core concepts of the topic."
+          },
+          {
+            id: 2,
+            question: "Why do researchers collect data from various testing sites?",
+            options: ["To publish fictional stories", "To analyze patterns and draw meaningful conclusions", "To delay scientific research", "To replace classroom textbooks"],
+            correctIndex: 1,
+            explanation: "The second paragraph notes that analyzing data helps experts draw conclusions."
+          },
+          {
+            id: 3,
+            question: "What does the word 'vital' mean as used in the final sentence?",
+            options: ["Unimportant", "Essential or necessary", "Extremely slow", "Temporary"],
+            correctIndex: 1,
+            explanation: "'Vital' in context refers to something crucial or necessary for understanding."
+          }
+        ]
       };
     }
 
@@ -613,12 +665,10 @@
         responses: JSON.stringify(studentAnswers)
       };
 
-      // Save locally for CSV export
       let existing = JSON.parse(localStorage.getItem('student_submissions') || '[]');
       existing.push(submissionRecord);
       localStorage.setItem('student_submissions', JSON.stringify(existing));
 
-      // Post to Google Webhook
       if (WEBHOOK_URL && !WEBHOOK_URL.includes('PASTE_YOUR')) {
         fetch(WEBHOOK_URL, {
           method: 'POST',
@@ -673,7 +723,7 @@
       const questionTypesStr = selectedQuestionTypes.join(', ');
 
       btn.disabled = true;
-      btn.innerText = 'Generating Assessment...';
+      btn.innerText = 'Generating Assessment (Please wait ~10-20s)...';
 
       const promptText = `Generate a ${selectedGenre} reading passage at a ${selectedLexile} Lexile level ${topicClause}. Length: ${selectedLength}. Do NOT include any vocabulary glossary or definition list. Provide exactly ${selectedNumQuestions} multiple-choice comprehension questions covering these question types: ${questionTypesStr}. Each question must have exactly 4 options (labeled index 0-3).
 Return ONLY valid JSON matching this exact structure:
@@ -693,33 +743,38 @@ Return ONLY valid JSON matching this exact structure:
 }`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'generate', prompt: promptText }),
+        body: JSON.stringify({
+          action: 'generate',
+          lexile: selectedLexile,
+          genre: selectedGenre,
+          length: selectedLength,
+          numQuestions: selectedNumQuestions,
+          questionTypes: questionTypesStr,
+          topic: userTopic || 'Random age-appropriate topic',
+          prompt: promptText
+        }),
         signal: controller.signal
       })
       .then(res => {
-        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP status ${res.status}`);
         return res.text();
       })
       .then(textData => {
         clearTimeout(timeoutId);
         let parsedData;
         try {
-          let jsonObj = JSON.parse(textData);
+          let jsonObj = parseAIResponse(textData);
+          if (jsonObj.error) throw new Error(jsonObj.error);
           let rawText = jsonObj.candidates?.[0]?.content?.parts?.[0]?.text || jsonObj.text || jsonObj.result || (typeof jsonObj === 'object' ? jsonObj : textData);
-          if (typeof rawText === 'object') {
-            parsedData = rawText;
-          } else {
-            let cleaned = String(rawText).replace(/```json/gi, '').replace(/```/g, '').trim();
-            parsedData = JSON.parse(cleaned);
-          }
+          parsedData = parseAIResponse(rawText);
         } catch (e) {
           console.error("Parsing error:", e, textData);
-          throw new Error("Invalid JSON structure from server.");
+          throw new Error(e.message || "Invalid JSON structure returned by server.");
         }
 
         currentPassage = sanitizePassage(parsedData);
@@ -727,10 +782,13 @@ Return ONLY valid JSON matching this exact structure:
         if (currentView === 'online') renderOnlineView(); else renderPrintView();
       })
       .catch(err => {
-        console.warn('Webhook generation failed or timed out:', err);
-        alertBox.innerText = 'Notice: Could not connect to AI Webhook server or request timed out. Loaded fallback sample passage.';
+        console.warn('Webhook generation failed:', err);
+        alertBox.innerText = `Notice: Webhook returned an error (${err.message}). Generated offline template for ${selectedLexile}.`;
         alertBox.style.display = 'block';
-        currentPassage = DEMO_PASSAGE;
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        currentPassage = generateFallbackPassage(userTopic, selectedLexile);
+        studentAnswers = {};
         if (currentView === 'online') renderOnlineView(); else renderPrintView();
       })
       .finally(() => {
